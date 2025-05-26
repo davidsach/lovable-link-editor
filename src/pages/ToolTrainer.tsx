@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,6 +5,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   Plus, 
   Play, 
@@ -255,135 +255,141 @@ const ToolTrainer = () => {
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
       />
       
-      <main className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-80'}`}>
-        <div className="p-6 max-w-6xl mx-auto">
-          <ExampleHeader 
-            example={currentExample}
-            onExampleChange={setCurrentExample}
-            onLoad={loadExample}
-            onAutoGenerate={autoGenerateExample}
-            isLoading={isLoading}
-          />
-          
-          <div className="grid gap-6">
-            {/* Action Bar */}
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex flex-wrap gap-3">
-                  <Button 
-                    onClick={() => addNewMessage('user')}
-                    className="bg-blue-600 hover:bg-blue-700"
-                  >
-                    <MessageSquare className="w-4 h-4 mr-2" />
-                    New Turn (User)
-                  </Button>
-                  
-                  <Button 
-                    onClick={() => addNewMessage('assistant')}
-                    variant="outline"
-                  >
-                    <MessageSquare className="w-4 h-4 mr-2" />
-                    New Turn (Assistant)
-                  </Button>
-                  
-                  <Separator orientation="vertical" className="h-8" />
-                  
-                  <Button 
-                    onClick={addTextChunk}
-                    variant="outline"
-                    disabled={!selectedMessageId}
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Text Chunk
-                  </Button>
-                  
-                  <Button 
-                    onClick={addToolCall}
-                    variant="outline"
-                    disabled={!selectedMessageId}
-                  >
-                    <Code className="w-4 h-4 mr-2" />
-                    Add Tool Call
-                  </Button>
-                  
-                  <Separator orientation="vertical" className="h-8" />
-                  
-                  <Button 
-                    onClick={getAllResults}
-                    disabled={isLoading}
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    <Play className="w-4 h-4 mr-2" />
-                    Get All Results
-                  </Button>
-                  
-                  <Button 
-                    onClick={goBack}
-                    variant="outline"
-                  >
-                    <ArrowLeft className="w-4 h-4 mr-2" />
-                    Back
-                  </Button>
-                  
-                  <Button 
-                    onClick={submitExample}
-                    className="bg-purple-600 hover:bg-purple-700 ml-auto"
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Submit
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Messages */}
-            <div className="space-y-4">
-              {currentExample.messages.map((message, index) => (
-                <MessageBuilder
-                  key={message.id}
-                  message={message}
-                  isSelected={selectedMessageId === message.id}
-                  onSelect={() => setSelectedMessageId(message.id)}
-                  onUpdate={(updatedMessage) => {
-                    setCurrentExample(prev => ({
-                      ...prev,
-                      messages: prev.messages.map(msg => 
-                        msg.id === message.id ? updatedMessage : msg
-                      )
-                    }));
-                  }}
-                  onGetToolResult={getToolResult}
-                  isLoading={isLoading}
-                  availableTools={availableTools}
-                />
-              ))}
+      <main className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-80'} flex flex-col`}>
+        {/* Scrollable content area */}
+        <div className="flex-1 overflow-hidden">
+          <ScrollArea className="h-full">
+            <div className="p-6 max-w-6xl mx-auto pb-32">
+              <ExampleHeader 
+                example={currentExample}
+                onExampleChange={setCurrentExample}
+                onLoad={loadExample}
+                onAutoGenerate={autoGenerateExample}
+                isLoading={isLoading}
+              />
               
-              {currentExample.messages.length === 0 && (
-                <Card className="border-dashed border-2 border-gray-300">
-                  <CardContent className="p-12 text-center">
-                    <MessageSquare className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No messages yet</h3>
-                    <p className="text-gray-500 mb-6">Start building your training example by adding a new turn</p>
-                    <div className="flex gap-3 justify-center">
-                      <Button 
-                        onClick={() => addNewMessage('user')}
-                        className="bg-blue-600 hover:bg-blue-700"
-                      >
-                        <MessageSquare className="w-4 h-4 mr-2" />
-                        Add User Message
-                      </Button>
-                      <Button 
-                        onClick={autoGenerateExample}
-                        variant="outline"
-                        disabled={isLoading}
-                      >
-                        <Sparkles className="w-4 h-4 mr-2" />
-                        Auto Generate
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+              <div className="grid gap-6 mt-6">
+                {/* Messages */}
+                <div className="space-y-4">
+                  {currentExample.messages.map((message, index) => (
+                    <MessageBuilder
+                      key={message.id}
+                      message={message}
+                      isSelected={selectedMessageId === message.id}
+                      onSelect={() => setSelectedMessageId(message.id)}
+                      onUpdate={(updatedMessage) => {
+                        setCurrentExample(prev => ({
+                          ...prev,
+                          messages: prev.messages.map(msg => 
+                            msg.id === message.id ? updatedMessage : msg
+                          )
+                        }));
+                      }}
+                      onGetToolResult={getToolResult}
+                      isLoading={isLoading}
+                      availableTools={availableTools}
+                    />
+                  ))}
+                  
+                  {currentExample.messages.length === 0 && (
+                    <Card className="border-dashed border-2 border-gray-300">
+                      <CardContent className="p-12 text-center">
+                        <MessageSquare className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">No messages yet</h3>
+                        <p className="text-gray-500 mb-6">Start building your training example by adding a new turn</p>
+                        <div className="flex gap-3 justify-center">
+                          <Button 
+                            onClick={() => addNewMessage('user')}
+                            className="bg-blue-600 hover:bg-blue-700"
+                          >
+                            <MessageSquare className="w-4 h-4 mr-2" />
+                            Add User Message
+                          </Button>
+                          <Button 
+                            onClick={autoGenerateExample}
+                            variant="outline"
+                            disabled={isLoading}
+                          >
+                            <Sparkles className="w-4 h-4 mr-2" />
+                            Auto Generate
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              </div>
+            </div>
+          </ScrollArea>
+        </div>
+
+        {/* Fixed Action Bar at bottom */}
+        <div className="fixed bottom-0 right-0 left-0 bg-white border-t border-gray-200 shadow-lg z-10" 
+             style={{ marginLeft: sidebarCollapsed ? '64px' : '320px' }}>
+          <div className="p-4 max-w-6xl mx-auto">
+            <div className="flex flex-wrap gap-3 items-center">
+              <Button 
+                onClick={() => addNewMessage('user')}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                <MessageSquare className="w-4 h-4 mr-2" />
+                New Turn (User)
+              </Button>
+              
+              <Button 
+                onClick={() => addNewMessage('assistant')}
+                variant="outline"
+              >
+                <MessageSquare className="w-4 h-4 mr-2" />
+                New Turn (Assistant)
+              </Button>
+              
+              <Separator orientation="vertical" className="h-8" />
+              
+              <Button 
+                onClick={addTextChunk}
+                variant="outline"
+                disabled={!selectedMessageId}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Text Chunk
+              </Button>
+              
+              <Button 
+                onClick={addToolCall}
+                variant="outline"
+                disabled={!selectedMessageId}
+              >
+                <Code className="w-4 h-4 mr-2" />
+                Add Tool Call
+              </Button>
+              
+              <Separator orientation="vertical" className="h-8" />
+              
+              <Button 
+                onClick={getAllResults}
+                disabled={isLoading}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                <Play className="w-4 h-4 mr-2" />
+                Get All Results
+              </Button>
+              
+              <Button 
+                onClick={goBack}
+                variant="outline"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back
+              </Button>
+              
+              <Button 
+                onClick={submitExample}
+                className="bg-purple-600 hover:bg-purple-700 ml-auto"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Submit
+              </Button>
             </div>
           </div>
         </div>
