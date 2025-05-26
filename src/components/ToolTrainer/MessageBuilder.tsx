@@ -164,7 +164,7 @@ export const MessageBuilder: React.FC<MessageBuilderProps> = ({
                       onGetToolResult(content.tool_id);
                     }
                   }}
-                  disabled={isLoading || !content.tool_name}
+                  disabled={isLoading}
                   size="sm"
                   className="bg-green-600 hover:bg-green-700"
                 >

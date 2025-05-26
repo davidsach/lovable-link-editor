@@ -133,7 +133,7 @@ const ToolTrainer = () => {
               ...msg,
               content: [...msg.content, { 
                 type: 'tool_call', 
-                content: '{\n  "function": "",\n  "parameters": {}\n}',
+                content: '# Write your Python tool call code here\nresult = tool_name.function_name(\n    param1="value1",\n    param2="value2"\n)',
                 tool_name: '',
                 tool_id: `tool_${Date.now()}`
               }]
@@ -229,7 +229,7 @@ const ToolTrainer = () => {
               { type: 'text', content: 'I\'ll help you find the function definition. Let me search your codebase.' },
               { 
                 type: 'tool_call', 
-                content: '{\n  "function": "find_definition",\n  "parameters": {\n    "symbol": "main",\n    "file_path": "src/app.py"\n  }\n}',
+                content: '# Search for function definition\nresult = codenav_api.find_definition(\n    symbol="main",\n    file_path="src/app.py"\n)',
                 tool_name: 'codenav_api',
                 tool_id: 'tool_auto_1'
               }
