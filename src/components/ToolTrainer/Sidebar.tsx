@@ -18,6 +18,29 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ tools, collapsed, onToggle }) => {
+  const toolItems = [
+    {
+      name: 'Get Tools',
+      description: 'List all the available tools with their name and description',
+      functions: ['code_search', 'find_definition', 'find_references']
+    },
+    {
+      name: 'Save a new tool',
+      description: 'Use example to save new tools',
+      functions: ['show_file', 'edit_file']
+    },
+    {
+      name: 'Existing Examples',
+      description: 'Web browsing and content extraction',
+      functions: ['browse']
+    },
+    {
+      name: 'Update example',
+      description: 'Update an example',
+      functions: ['get_ide_state']
+    }
+  ];
+
   return (
     <div className={`fixed left-0 top-0 h-full bg-white border-r border-gray-200 transition-all duration-300 z-10 ${
       collapsed ? 'w-16' : 'w-80'
@@ -41,36 +64,32 @@ export const Sidebar: React.FC<SidebarProps> = ({ tools, collapsed, onToggle }) 
       
       {!collapsed && (
         <div className="p-4 space-y-4 overflow-y-auto h-full pb-20">
-          {tools.map((tool, index) => (
-            <Card key={index} className="hover:shadow-md transition-shadow">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-blue-700 flex items-center">
-                  <Code className="w-4 h-4 mr-2" />
-                  {tool.name}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <p className="text-xs text-gray-600 mb-3">{tool.description}</p>
-                <div className="space-y-1">
-                  {tool.functions.map((func, funcIndex) => (
-                    <Badge 
-                      key={funcIndex} 
-                      variant="secondary" 
-                      className="text-xs mr-1 mb-1"
-                    >
-                      {func}
-                    </Badge>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+          {toolItems.map((tool, index) => (
+            <div key={index} className="space-y-2">
+              <div className="flex items-center text-blue-600 font-medium">
+                <Code className="w-4 h-4 mr-2" />
+                {tool.name}
+              </div>
+              <p className="text-sm text-gray-600 ml-6">{tool.description}</p>
+              <div className="ml-6 space-y-1">
+                {tool.functions.map((func, funcIndex) => (
+                  <Badge 
+                    key={funcIndex} 
+                    variant="secondary" 
+                    className="text-xs mr-1 mb-1"
+                  >
+                    {func}
+                  </Badge>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       )}
       
       {collapsed && (
         <div className="p-2 space-y-2 overflow-y-auto h-full pb-20">
-          {tools.map((tool, index) => (
+          {toolItems.map((tool, index) => (
             <div 
               key={index}
               className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center hover:bg-blue-100 transition-colors"

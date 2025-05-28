@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -66,23 +67,23 @@ const ToolTrainer = () => {
 
   const availableTools = [
     {
-      name: 'codenav_api',
-      description: 'Navigate and search code repositories',
+      name: 'Get Tools',
+      description: 'List all the available tools with their name and description',
       functions: ['code_search', 'find_definition', 'find_references']
     },
     {
-      name: 'file_api',
-      description: 'File operations and content management',
+      name: 'Save a new tool',
+      description: 'Use example to save new tools',
       functions: ['show_file', 'edit_file']
     },
     {
-      name: 'browsing_api',
+      name: 'Existing Examples',
       description: 'Web browsing and content extraction',
       functions: ['browse']
     },
     {
-      name: 'workspace_api',
-      description: 'Workspace management and state',
+      name: 'Update example',
+      description: 'Update an example',
       functions: ['get_ide_state']
     }
   ];
