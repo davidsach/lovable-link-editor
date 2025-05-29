@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -25,6 +24,8 @@ import { Sidebar } from '@/components/ToolTrainer/Sidebar';
 import { MessageBuilder } from '@/components/ToolTrainer/MessageBuilder';
 import { ToolCallEditor } from '@/components/ToolTrainer/ToolCallEditor';
 import { ExampleHeader } from '@/components/ToolTrainer/ExampleHeader';
+import { useTools, useExamples, useCreateExample, useUpdateExample } from '@/hooks/useApi';
+import { CreateExampleRequest, Step } from '@/services/api';
 
 export interface Message {
   id: string;
@@ -65,7 +66,53 @@ const ToolTrainer = () => {
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const availableTools = [
+  // API hooks
+  const { data: tools = [], isLoading: toolsLoading } = useTools();
+  const { data: examples = [], isLoading: examplesLoading } = useExamples();
+  const createExampleMutation = useCreateExample();
+  const updateExampleMutation = useUpdateExample();
+
+  // Convert messages to API format
+  const convertToApiFormat = (example: TrainingExample): CreateExampleRequest => {
+    const steps: Step[] = [];
+    
+    // Extract user prompt from first user message
+    const firstUserMessage = example.messages.find(msg => msg.role === 'user');
+    const userPrompt = firstUserMessage?.content
+      .filter(c => c.type === 'text')
+      .map(c => c.content)
+      .join(' ') || '';
+
+    // Convert tool calls to steps
+    example.messages.forEach(message => {
+      if (message.role === 'assistant') {
+        message.content.forEach(content => {
+          if (content.type === 'tool_call' && content.tool_name) {
+            steps.push({
+              thought: `Using ${content.tool_name} to process the request`,
+              tool_name: content.tool_name,
+              tool_params: { code: content.content },
+              tool_result: 'Result pending...'
+            });
+          }
+        });
+      }
+    });
+
+    return {
+      id: example.id === 'new' ? `example_${Date.now()}` : example.id,
+      name: example.name,
+      description: example.description,
+      tags: example.metadata.tags,
+      user_prompt: userPrompt,
+      steps,
+      created: example.metadata.created_at,
+      updated: new Date().toISOString()
+    };
+  };
+
+  // Use tools from API or fallback to static data
+  const availableTools = tools.length > 0 ? tools : [
     {
       name: 'Get Tools',
       description: 'List all the available tools with their name and description',
@@ -181,16 +228,31 @@ const ToolTrainer = () => {
     }
   };
 
-  const submitExample = () => {
-    const dataStr = JSON.stringify(currentExample, null, 2);
-    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-    
-    const exportFileDefaultName = `training_example_${Date.now()}.json`;
-    
-    const linkElement = document.createElement('a');
-    linkElement.setAttribute('href', dataUri);
-    linkElement.setAttribute('download', exportFileDefaultName);
-    linkElement.click();
+  const submitExample = async () => {
+    try {
+      const apiExample = convertToApiFormat(currentExample);
+      
+      if (currentExample.id === 'new') {
+        await createExampleMutation.mutateAsync(apiExample);
+      } else {
+        await updateExampleMutation.mutateAsync({
+          exampleId: currentExample.id,
+          example: apiExample
+        });
+      }
+    } catch (error) {
+      console.error('Error submitting example:', error);
+      // Fallback to download if API fails
+      const dataStr = JSON.stringify(currentExample, null, 2);
+      const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+      
+      const exportFileDefaultName = `training_example_${Date.now()}.json`;
+      
+      const linkElement = document.createElement('a');
+      linkElement.setAttribute('href', dataUri);
+      linkElement.setAttribute('download', exportFileDefaultName);
+      linkElement.click();
+    }
   };
 
   const loadExample = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -266,7 +328,7 @@ const ToolTrainer = () => {
                 onExampleChange={setCurrentExample}
                 onLoad={loadExample}
                 onAutoGenerate={autoGenerateExample}
-                isLoading={isLoading}
+                isLoading={isLoading || createExampleMutation.isPending || updateExampleMutation.isPending}
               />
               
               <div className="grid gap-6 mt-6">
@@ -386,10 +448,11 @@ const ToolTrainer = () => {
               
               <Button 
                 onClick={submitExample}
+                disabled={createExampleMutation.isPending || updateExampleMutation.isPending}
                 className="bg-purple-600 hover:bg-purple-700 ml-auto"
               >
                 <Download className="w-4 h-4 mr-2" />
-                Submit
+                {createExampleMutation.isPending || updateExampleMutation.isPending ? 'Submitting...' : 'Submit'}
               </Button>
             </div>
           </div>
