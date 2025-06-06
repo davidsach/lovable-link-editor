@@ -7,6 +7,29 @@ export interface Tool {
   functions: string[];
 }
 
+export interface ToolParameter {
+  name: string;
+  type: 'text' | 'number' | 'boolean';
+  description?: string;
+  required?: boolean;
+}
+
+export interface ToolSchema {
+  tool_name: string;
+  parameters: ToolParameter[];
+}
+
+export interface ToolExecuteRequest {
+  tool_name: string;
+  parameters: Record<string, any>;
+}
+
+export interface ToolExecuteResponse {
+  status: string;
+  result: any;
+  error?: string;
+}
+
 export interface Step {
   thought: string;
   tool_name: string;
@@ -52,6 +75,36 @@ class ApiService {
       return data;
     } catch (error) {
       console.error('Error fetching tools:', error);
+      throw error;
+    }
+  }
+
+  // Get Tool Schema
+  async getToolSchema(toolName: string): Promise<ToolSchema> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/tools/${toolName}/schema`);
+      const data = await response.json();
+      console.log('Tool schema data:', data);
+      return data;
+    } catch (error) {
+      console.error('Error fetching tool schema:', error);
+      throw error;
+    }
+  }
+
+  // Execute Tool
+  async executeTool(request: ToolExecuteRequest): Promise<ToolExecuteResponse> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/tools/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request)
+      });
+      const data = await response.json();
+      console.log('Tool execute response:', data);
+      return data;
+    } catch (error) {
+      console.error('Error executing tool:', error);
       throw error;
     }
   }

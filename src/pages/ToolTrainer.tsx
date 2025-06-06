@@ -1,10 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
-import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   Plus, 
@@ -13,18 +9,14 @@ import {
   ArrowLeft, 
   Upload, 
   Download,
-  Code,
   MessageSquare,
-  Wrench,
-  ChevronLeft,
-  ChevronRight,
-  Sparkles
+  Sparkles,
+  AlertTriangle
 } from 'lucide-react';
 import { Sidebar } from '@/components/ToolTrainer/Sidebar';
 import { MessageBuilder } from '@/components/ToolTrainer/MessageBuilder';
-import { ToolCallEditor } from '@/components/ToolTrainer/ToolCallEditor';
 import { ExampleHeader } from '@/components/ToolTrainer/ExampleHeader';
-import { useTools, useExamples, useCreateExample, useUpdateExample } from '@/hooks/useApi';
+import { useTools, useExamples, useCreateExample, useUpdateExample, useExecuteTool } from '@/hooks/useApi';
 import { CreateExampleRequest, Step } from '@/services/api';
 
 export interface Message {
@@ -71,6 +63,7 @@ const ToolTrainer = () => {
   const { data: examples = [], isLoading: examplesLoading } = useExamples();
   const createExampleMutation = useCreateExample();
   const updateExampleMutation = useUpdateExample();
+  const executeToolMutation = useExecuteTool();
 
   // Convert messages to API format
   const convertToApiFormat = (example: TrainingExample): CreateExampleRequest => {
@@ -114,32 +107,76 @@ const ToolTrainer = () => {
   // Use tools from API or fallback to static data
   const availableTools = tools.length > 0 ? tools : [
     {
-      name: 'Get Tools',
-      description: 'List all the available tools with their name and description',
+      name: 'browser_tools',
+      description: 'Tools for web browsing and content extraction',
+      functions: ['browse', 'extract_content', 'screenshot']
+    },
+    {
+      name: 'codenav_api',
+      description: 'Tools for code navigation and analysis',
       functions: ['code_search', 'find_definition', 'find_references']
     },
     {
-      name: 'Save a new tool',
-      description: 'Use example to save new tools',
-      functions: ['show_file', 'edit_file']
+      name: 'str_replace_editor',
+      description: 'Tools for file editing and manipulation',
+      functions: ['show_file', 'edit_file', 'create_file']
     },
     {
-      name: 'Existing Examples',
-      description: 'Web browsing and content extraction',
-      functions: ['browse']
-    },
-    {
-      name: 'Update example',
-      description: 'Update an example',
-      functions: ['get_ide_state']
+      name: 'bash',
+      description: 'Execute bash commands and scripts',
+      functions: ['execute_command']
     }
   ];
 
-  const addNewMessage = (role: 'user' | 'assistant') => {
+  // Validation functions
+  const validateMessages = () => {
+    const messages = currentExample.messages;
+    const errors = [];
+
+    // Check if first message is user
+    if (messages.length > 0 && messages[0].role !== 'user') {
+      errors.push('First message must be from user');
+    }
+
+    // Check if last message is assistant
+    if (messages.length > 0 && messages[messages.length - 1].role !== 'assistant') {
+      errors.push('Last message must be from assistant');
+    }
+
+    // Check for empty content
+    messages.forEach((msg, msgIndex) => {
+      msg.content.forEach((content, contentIndex) => {
+        if (!content.content.trim()) {
+          errors.push(`Message ${msgIndex + 1}, chunk ${contentIndex + 1} is empty`);
+        }
+      });
+    });
+
+    // Check user messages have only one text chunk
+    messages.forEach((msg, msgIndex) => {
+      if (msg.role === 'user') {
+        const textChunks = msg.content.filter(c => c.type === 'text');
+        if (textChunks.length > 1) {
+          errors.push(`User message ${msgIndex + 1} has multiple text chunks (only one allowed)`);
+        }
+        if (textChunks.length === 0) {
+          errors.push(`User message ${msgIndex + 1} must have a text chunk`);
+        }
+      }
+    });
+
+    return errors;
+  };
+
+  const addNewTurn = () => {
+    const messages = currentExample.messages;
+    const lastRole = messages.length > 0 ? messages[messages.length - 1].role : 'assistant';
+    const newRole = lastRole === 'user' ? 'assistant' : 'user';
+    
     const newMessage: Message = {
       id: `msg_${Date.now()}`,
-      role,
-      content: [{ type: 'text', content: '' }]
+      role: newRole,
+      content: newRole === 'user' ? [{ type: 'text', content: '' }] : []
     };
     
     setCurrentExample(prev => ({
@@ -154,69 +191,156 @@ const ToolTrainer = () => {
     setSelectedMessageId(newMessage.id);
   };
 
-  const addTextChunk = () => {
-    if (!selectedMessageId) return;
-    
-    setCurrentExample(prev => ({
-      ...prev,
-      messages: prev.messages.map(msg => 
-        msg.id === selectedMessageId
-          ? {
-              ...msg,
-              content: [...msg.content, { type: 'text', content: '' }]
-            }
-          : msg
-      )
-    }));
-  };
-
-  const addToolCall = () => {
-    if (!selectedMessageId) return;
-    
-    setCurrentExample(prev => ({
-      ...prev,
-      messages: prev.messages.map(msg => 
-        msg.id === selectedMessageId
-          ? {
-              ...msg,
-              content: [...msg.content, { 
-                type: 'tool_call', 
-                content: '# Write your Python tool call code here\nresult = tool_name.function_name(\n    param1="value1",\n    param2="value2"\n)',
-                tool_name: '',
-                tool_id: `tool_${Date.now()}`
-              }]
-            }
-          : msg
-      )
-    }));
-  };
-
   const getToolResult = async (toolId: string) => {
     setIsLoading(true);
-    // Simulate API call
-    setTimeout(() => {
+    
+    // Find the tool call
+    const messageWithTool = currentExample.messages.find(msg => 
+      msg.content.some(content => content.tool_id === toolId)
+    );
+    
+    if (!messageWithTool) {
+      setIsLoading(false);
+      return;
+    }
+
+    const toolCall = messageWithTool.content.find(content => content.tool_id === toolId);
+    if (!toolCall || !toolCall.tool_name) {
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      // Try to parse parameters from tool call content
+      let parameters = {};
+      try {
+        // Simple parameter extraction from tool call content
+        const paramMatch = toolCall.content.match(/\{[\s\S]*\}/);
+        if (paramMatch) {
+          parameters = JSON.parse(paramMatch[0]);
+        }
+      } catch (e) {
+        console.warn('Could not parse parameters from tool call');
+      }
+
+      const result = await executeToolMutation.mutateAsync({
+        tool_name: toolCall.tool_name,
+        parameters
+      });
+
+      const formattedResult = typeof result.result === 'object' 
+        ? JSON.stringify(result.result, null, 2)
+        : String(result.result);
+
+      // Add tool result after the tool call
       setCurrentExample(prev => ({
         ...prev,
         messages: prev.messages.map(msg => ({
           ...msg,
           content: msg.content.map(content => 
             content.tool_id === toolId
-              ? { ...content, type: 'tool_result' as const, content: 'Tool result placeholder' }
+              ? content
               : content
+          ).concat(
+            content.tool_id === toolId 
+              ? [{ type: 'tool_result' as const, content: formattedResult }]
+              : []
           )
         }))
       }));
-      setIsLoading(false);
-    }, 1000);
+    } catch (error) {
+      console.error('Failed to get tool result:', error);
+    }
+    
+    setIsLoading(false);
   };
 
   const getAllResults = async () => {
     setIsLoading(true);
-    // Simulate getting all tool results
-    setTimeout(() => {
-      console.log('Getting all tool results...');
-      setIsLoading(false);
-    }, 1500);
+    
+    // Collect all tool calls
+    const toolCalls: Array<{messageId: string, contentIndex: number, toolCall: any}> = [];
+    
+    currentExample.messages.forEach(msg => {
+      msg.content.forEach((content, index) => {
+        if (content.type === 'tool_call' && content.tool_name && content.tool_id) {
+          toolCalls.push({
+            messageId: msg.id,
+            contentIndex: index,
+            toolCall: content
+          });
+        }
+      });
+    });
+
+    try {
+      // Execute all tool calls
+      const results = await Promise.all(
+        toolCalls.map(async ({ toolCall }) => {
+          try {
+            let parameters = {};
+            try {
+              const paramMatch = toolCall.content.match(/\{[\s\S]*\}/);
+              if (paramMatch) {
+                parameters = JSON.parse(paramMatch[0]);
+              }
+            } catch (e) {
+              console.warn('Could not parse parameters from tool call');
+            }
+
+            const result = await executeToolMutation.mutateAsync({
+              tool_name: toolCall.tool_name,
+              parameters
+            });
+
+            return {
+              toolId: toolCall.tool_id,
+              result: typeof result.result === 'object' 
+                ? JSON.stringify(result.result, null, 2)
+                : String(result.result)
+            };
+          } catch (error) {
+            return {
+              toolId: toolCall.tool_id,
+              result: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
+            };
+          }
+        })
+      );
+
+      // Update all tool results
+      setCurrentExample(prev => ({
+        ...prev,
+        messages: prev.messages.map(msg => ({
+          ...msg,
+          content: msg.content.map(content => {
+            if (content.type === 'tool_call' && content.tool_id) {
+              const result = results.find(r => r.toolId === content.tool_id);
+              if (result) {
+                return content;
+              }
+            }
+            return content;
+          }).concat(
+            // Add tool results after tool calls
+            msg.content
+              .filter(content => content.type === 'tool_call' && content.tool_id)
+              .map(content => {
+                const result = results.find(r => r.toolId === content.tool_id);
+                return result ? {
+                  type: 'tool_result' as const,
+                  content: result.result
+                } : null;
+              })
+              .filter(Boolean)
+          )
+        }))
+      }));
+    } catch (error) {
+      console.error('Failed to get all tool results:', error);
+    }
+    
+    setIsLoading(false);
   };
 
   const goBack = () => {
@@ -310,6 +434,9 @@ const ToolTrainer = () => {
     }, 1000);
   };
 
+  const validationErrors = validateMessages();
+  const canSubmit = validationErrors.length === 0 && currentExample.messages.length > 0;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex">
       <Sidebar 
@@ -319,7 +446,6 @@ const ToolTrainer = () => {
       />
       
       <main className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-80'} flex flex-col`}>
-        {/* Scrollable content area */}
         <div className="flex-1 overflow-hidden">
           <ScrollArea className="h-full">
             <div className="p-6 max-w-6xl mx-auto pb-32">
@@ -331,8 +457,24 @@ const ToolTrainer = () => {
                 isLoading={isLoading || createExampleMutation.isPending || updateExampleMutation.isPending}
               />
               
+              {/* Validation Errors */}
+              {validationErrors.length > 0 && (
+                <Card className="mt-6 border-red-200 bg-red-50">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <AlertTriangle className="w-5 h-5 text-red-600" />
+                      <h3 className="font-medium text-red-800">Validation Errors</h3>
+                    </div>
+                    <ul className="text-sm text-red-700 space-y-1">
+                      {validationErrors.map((error, index) => (
+                        <li key={index}>• {error}</li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+              )}
+              
               <div className="grid gap-6 mt-6">
-                {/* Messages */}
                 <div className="space-y-4">
                   {currentExample.messages.map((message, index) => (
                     <MessageBuilder
@@ -351,6 +493,8 @@ const ToolTrainer = () => {
                       onGetToolResult={getToolResult}
                       isLoading={isLoading}
                       availableTools={availableTools}
+                      isFirstMessage={index === 0}
+                      isLastMessage={index === currentExample.messages.length - 1}
                     />
                   ))}
                   
@@ -362,11 +506,11 @@ const ToolTrainer = () => {
                         <p className="text-gray-500 mb-6">Start building your training example by adding a new turn</p>
                         <div className="flex gap-3 justify-center">
                           <Button 
-                            onClick={() => addNewMessage('user')}
+                            onClick={addNewTurn}
                             className="bg-blue-600 hover:bg-blue-700"
                           >
-                            <MessageSquare className="w-4 h-4 mr-2" />
-                            Add User Message
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add New Turn
                           </Button>
                           <Button 
                             onClick={autoGenerateExample}
@@ -386,48 +530,18 @@ const ToolTrainer = () => {
           </ScrollArea>
         </div>
 
-        {/* Fixed Action Bar at bottom */}
+        {/* Fixed Action Bar */}
         <div className="fixed bottom-0 right-0 left-0 bg-white border-t border-gray-200 shadow-lg z-10" 
              style={{ marginLeft: sidebarCollapsed ? '64px' : '320px' }}>
           <div className="p-4 max-w-6xl mx-auto">
             <div className="flex flex-wrap gap-3 items-center">
               <Button 
-                onClick={() => addNewMessage('user')}
+                onClick={addNewTurn}
                 className="bg-blue-600 hover:bg-blue-700"
               >
-                <MessageSquare className="w-4 h-4 mr-2" />
-                New Turn (User)
-              </Button>
-              
-              <Button 
-                onClick={() => addNewMessage('assistant')}
-                variant="outline"
-              >
-                <MessageSquare className="w-4 h-4 mr-2" />
-                New Turn (Assistant)
-              </Button>
-              
-              <Separator orientation="vertical" className="h-8" />
-              
-              <Button 
-                onClick={addTextChunk}
-                variant="outline"
-                disabled={!selectedMessageId}
-              >
                 <Plus className="w-4 h-4 mr-2" />
-                Add Text Chunk
+                New Turn
               </Button>
-              
-              <Button 
-                onClick={addToolCall}
-                variant="outline"
-                disabled={!selectedMessageId}
-              >
-                <Code className="w-4 h-4 mr-2" />
-                Add Tool Call
-              </Button>
-              
-              <Separator orientation="vertical" className="h-8" />
               
               <Button 
                 onClick={getAllResults}
@@ -441,6 +555,7 @@ const ToolTrainer = () => {
               <Button 
                 onClick={goBack}
                 variant="outline"
+                disabled={currentExample.messages.length === 0}
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back
@@ -448,7 +563,7 @@ const ToolTrainer = () => {
               
               <Button 
                 onClick={submitExample}
-                disabled={createExampleMutation.isPending || updateExampleMutation.isPending}
+                disabled={!canSubmit || createExampleMutation.isPending || updateExampleMutation.isPending}
                 className="bg-purple-600 hover:bg-purple-700 ml-auto"
               >
                 <Download className="w-4 h-4 mr-2" />

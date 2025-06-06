@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MessageSquare, User, Bot, Play, Loader2, X } from 'lucide-react';
+import { MessageSquare, User, Bot, Play, Loader2, X, Plus, ArrowLeft } from 'lucide-react';
 import { ToolCallEditor } from './ToolCallEditor';
 import { Message } from '../../pages/ToolTrainer';
 
@@ -23,6 +23,8 @@ interface MessageBuilderProps {
   onGetToolResult: (toolId: string) => void;
   isLoading: boolean;
   availableTools: Tool[];
+  isFirstMessage?: boolean;
+  isLastMessage?: boolean;
 }
 
 export const MessageBuilder: React.FC<MessageBuilderProps> = ({
@@ -32,7 +34,9 @@ export const MessageBuilder: React.FC<MessageBuilderProps> = ({
   onUpdate,
   onGetToolResult,
   isLoading,
-  availableTools
+  availableTools,
+  isFirstMessage = false,
+  isLastMessage = false
 }) => {
   const updateContent = (index: number, newContent: string) => {
     const updatedMessage = {
@@ -62,13 +66,39 @@ export const MessageBuilder: React.FC<MessageBuilderProps> = ({
     onUpdate(updatedMessage);
   };
 
+  const addTextChunk = () => {
+    const updatedMessage = {
+      ...message,
+      content: [...message.content, { type: 'text' as const, content: '' }]
+    };
+    onUpdate(updatedMessage);
+  };
+
+  const addToolCall = () => {
+    const updatedMessage = {
+      ...message,
+      content: [...message.content, { 
+        type: 'tool_call' as const, 
+        content: '',
+        tool_name: '',
+        tool_id: `tool_${Date.now()}`
+      }]
+    };
+    onUpdate(updatedMessage);
+  };
+
+  // Validation checks
+  const hasTextChunk = message.content.some(c => c.type === 'text');
+  const canAddTextChunk = message.role === 'user' && !hasTextChunk;
+  const hasEmptyContent = message.content.some(c => !c.content.trim());
+
   return (
     <Card 
       className={`transition-all cursor-pointer ${
         isSelected 
           ? 'ring-2 ring-blue-500 shadow-lg' 
           : 'hover:shadow-md'
-      }`}
+      } ${hasEmptyContent ? 'border-red-300' : ''}`}
       onClick={onSelect}
     >
       <CardHeader className="pb-3">
@@ -85,10 +115,22 @@ export const MessageBuilder: React.FC<MessageBuilderProps> = ({
             >
               {message.role}
             </Badge>
+            {(isFirstMessage || isLastMessage) && (
+              <Badge variant="outline" className="text-xs">
+                {isFirstMessage ? 'First' : 'Last'}
+              </Badge>
+            )}
           </div>
-          <Badge variant="outline" className="text-xs">
-            {message.content.length} chunk{message.content.length !== 1 ? 's' : ''}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="text-xs">
+              {message.content.length} chunk{message.content.length !== 1 ? 's' : ''}
+            </Badge>
+            {hasEmptyContent && (
+              <Badge variant="destructive" className="text-xs">
+                Empty content
+              </Badge>
+            )}
+          </div>
         </div>
       </CardHeader>
       
@@ -106,19 +148,37 @@ export const MessageBuilder: React.FC<MessageBuilderProps> = ({
               >
                 {content.type.replace('_', ' ')}
               </Badge>
-              {message.content.length > 1 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeContent(index);
-                  }}
-                  className="h-6 w-6 p-0 text-gray-400 hover:text-red-500"
-                >
-                  <X className="w-3 h-3" />
-                </Button>
-              )}
+              <div className="flex items-center gap-1">
+                {index > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // Move content up
+                      const newContent = [...message.content];
+                      [newContent[index], newContent[index - 1]] = [newContent[index - 1], newContent[index]];
+                      onUpdate({ ...message, content: newContent });
+                    }}
+                    className="h-6 w-6 p-0"
+                  >
+                    <ArrowLeft className="w-3 h-3 rotate-90" />
+                  </Button>
+                )}
+                {message.content.length > 1 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeContent(index);
+                    }}
+                    className="h-6 w-6 p-0 text-gray-400 hover:text-red-500"
+                  >
+                    <X className="w-3 h-3" />
+                  </Button>
+                )}
+              </div>
             </div>
             
             {content.type === 'text' && (
@@ -129,7 +189,7 @@ export const MessageBuilder: React.FC<MessageBuilderProps> = ({
                   updateContent(index, e.target.value);
                 }}
                 placeholder="Enter message content..."
-                className="min-h-[80px]"
+                className={`min-h-[80px] ${!content.content.trim() ? 'border-red-300' : ''}`}
                 onClick={(e) => e.stopPropagation()}
               />
             )}
@@ -188,6 +248,33 @@ export const MessageBuilder: React.FC<MessageBuilderProps> = ({
             )}
           </div>
         ))}
+
+        {/* Action buttons for selected message */}
+        {isSelected && (
+          <div className="flex gap-2 pt-3 border-t" onClick={(e) => e.stopPropagation()}>
+            {canAddTextChunk && (
+              <Button
+                onClick={addTextChunk}
+                variant="outline"
+                size="sm"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Text Chunk
+              </Button>
+            )}
+            
+            {message.role === 'assistant' && (
+              <Button
+                onClick={addToolCall}
+                variant="outline"
+                size="sm"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Tool Call
+              </Button>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

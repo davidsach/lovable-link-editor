@@ -1,6 +1,6 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiService, Tool, Example, CreateExampleRequest } from '../services/api';
+import { apiService, Tool, Example, CreateExampleRequest, ToolSchema, ToolExecuteRequest } from '../services/api';
 import { useToast } from './use-toast';
 
 export const useTools = () => {
@@ -8,6 +8,30 @@ export const useTools = () => {
     queryKey: ['tools'],
     queryFn: () => apiService.getTools(),
     staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+};
+
+export const useToolSchema = (toolName: string) => {
+  return useQuery({
+    queryKey: ['toolSchema', toolName],
+    queryFn: () => apiService.getToolSchema(toolName),
+    enabled: !!toolName,
+  });
+};
+
+export const useExecuteTool = () => {
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (request: ToolExecuteRequest) => apiService.executeTool(request),
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: 'Failed to execute tool',
+        variant: 'destructive',
+      });
+      console.error('Execute tool error:', error);
+    },
   });
 };
 
