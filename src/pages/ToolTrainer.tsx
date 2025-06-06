@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -79,12 +80,12 @@ const ToolTrainer = () => {
     // Convert tool calls to steps
     example.messages.forEach(message => {
       if (message.role === 'assistant') {
-        message.content.forEach(content => {
-          if (content.type === 'tool_call' && content.tool_name) {
+        message.content.forEach(messageContent => {
+          if (messageContent.type === 'tool_call' && messageContent.tool_name) {
             steps.push({
-              thought: `Using ${content.tool_name} to process the request`,
-              tool_name: content.tool_name,
-              tool_params: { code: content.content },
+              thought: `Using ${messageContent.tool_name} to process the request`,
+              tool_name: messageContent.tool_name,
+              tool_params: { code: messageContent.content },
               tool_result: 'Result pending...'
             });
           }
@@ -145,8 +146,8 @@ const ToolTrainer = () => {
 
     // Check for empty content
     messages.forEach((msg, msgIndex) => {
-      msg.content.forEach((content, contentIndex) => {
-        if (!content.content.trim()) {
+      msg.content.forEach((messageContent, contentIndex) => {
+        if (!messageContent.content.trim()) {
           errors.push(`Message ${msgIndex + 1}, chunk ${contentIndex + 1} is empty`);
         }
       });
@@ -196,7 +197,7 @@ const ToolTrainer = () => {
     
     // Find the tool call
     const messageWithTool = currentExample.messages.find(msg => 
-      msg.content.some(content => content.tool_id === toolId)
+      msg.content.some(messageContent => messageContent.tool_id === toolId)
     );
     
     if (!messageWithTool) {
@@ -204,7 +205,7 @@ const ToolTrainer = () => {
       return;
     }
 
-    const toolCall = messageWithTool.content.find(content => content.tool_id === toolId);
+    const toolCall = messageWithTool.content.find(messageContent => messageContent.tool_id === toolId);
     if (!toolCall || !toolCall.tool_name) {
       setIsLoading(false);
       return;
@@ -237,12 +238,12 @@ const ToolTrainer = () => {
         ...prev,
         messages: prev.messages.map(msg => ({
           ...msg,
-          content: msg.content.map(content => 
-            content.tool_id === toolId
-              ? content
-              : content
+          content: msg.content.map(messageContent => 
+            messageContent.tool_id === toolId
+              ? messageContent
+              : messageContent
           ).concat(
-            content.tool_id === toolId 
+            messageContent.tool_id === toolId 
               ? [{ type: 'tool_result' as const, content: formattedResult }]
               : []
           )
@@ -262,12 +263,12 @@ const ToolTrainer = () => {
     const toolCalls: Array<{messageId: string, contentIndex: number, toolCall: any}> = [];
     
     currentExample.messages.forEach(msg => {
-      msg.content.forEach((content, index) => {
-        if (content.type === 'tool_call' && content.tool_name && content.tool_id) {
+      msg.content.forEach((messageContent, index) => {
+        if (messageContent.type === 'tool_call' && messageContent.tool_name && messageContent.tool_id) {
           toolCalls.push({
             messageId: msg.id,
             contentIndex: index,
-            toolCall: content
+            toolCall: messageContent
           });
         }
       });
@@ -313,20 +314,20 @@ const ToolTrainer = () => {
         ...prev,
         messages: prev.messages.map(msg => ({
           ...msg,
-          content: msg.content.map(content => {
-            if (content.type === 'tool_call' && content.tool_id) {
-              const result = results.find(r => r.toolId === content.tool_id);
+          content: msg.content.map(messageContent => {
+            if (messageContent.type === 'tool_call' && messageContent.tool_id) {
+              const result = results.find(r => r.toolId === messageContent.tool_id);
               if (result) {
-                return content;
+                return messageContent;
               }
             }
-            return content;
+            return messageContent;
           }).concat(
             // Add tool results after tool calls
             msg.content
-              .filter(content => content.type === 'tool_call' && content.tool_id)
-              .map(content => {
-                const result = results.find(r => r.toolId === content.tool_id);
+              .filter(messageContent => messageContent.type === 'tool_call' && messageContent.tool_id)
+              .map(messageContent => {
+                const result = results.find(r => r.toolId === messageContent.tool_id);
                 return result ? {
                   type: 'tool_result' as const,
                   content: result.result
