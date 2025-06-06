@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -238,12 +237,12 @@ const ToolTrainer = () => {
         ...prev,
         messages: prev.messages.map(msg => ({
           ...msg,
-          content: msg.content.map(messageContent => 
-            messageContent.tool_id === toolId
-              ? messageContent
-              : messageContent
+          content: msg.content.map(content => 
+            content.tool_id === toolId
+              ? content
+              : content
           ).concat(
-            messageContent.tool_id === toolId 
+            msg.content.some(content => content.tool_id === toolId) 
               ? [{ type: 'tool_result' as const, content: formattedResult }]
               : []
           )
@@ -325,9 +324,9 @@ const ToolTrainer = () => {
           }).concat(
             // Add tool results after tool calls
             msg.content
-              .filter(messageContent => messageContent.type === 'tool_call' && messageContent.tool_id)
-              .map(messageContent => {
-                const result = results.find(r => r.toolId === messageContent.tool_id);
+              .filter(content => content.type === 'tool_call' && content.tool_id)
+              .map(content => {
+                const result = results.find(r => r.toolId === content.tool_id);
                 return result ? {
                   type: 'tool_result' as const,
                   content: result.result
