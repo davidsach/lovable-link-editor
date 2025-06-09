@@ -5,9 +5,10 @@ import { Textarea } from '@/components/ui/textarea';
 interface ToolCallEditorProps {
   value: string;
   onChange: (value: string) => void;
+  className?: string;
 }
 
-export const ToolCallEditor: React.FC<ToolCallEditorProps> = ({ value, onChange }) => {
+export const ToolCallEditor: React.FC<ToolCallEditorProps> = ({ value, onChange, className }) => {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
@@ -22,7 +23,7 @@ result = tool_name.function_name(
     param1="value1",
     param2="value2"
 )'
-          className="font-mono text-sm min-h-[120px] bg-gray-50 border-gray-300"
+          className={`font-mono text-sm min-h-[120px] bg-gray-50 border-gray-300 ${className || ''}`}
           spellCheck={false}
         />
         <div className="absolute top-2 right-2">
