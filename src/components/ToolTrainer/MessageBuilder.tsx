@@ -178,12 +178,16 @@ export const MessageBuilder: React.FC<MessageBuilderProps> = ({
             
             {content.type === 'tool_call' && (
               <ToolCallStep
-                content={content}
+                stepIndex={index}
+                toolName={content.tool_name || ''}
+                parameters={{}}
+                toolResult=""
                 availableTools={availableTools}
-                onContentChange={(newContent) => updateContent(index, newContent)}
                 onToolNameChange={(toolName) => updateToolName(index, toolName)}
-                onGetToolResult={onGetToolResult}
-                isLoading={isLoading}
+                onParametersChange={() => {}}
+                onToolResultChange={() => {}}
+                onDelete={() => removeContent(index)}
+                onExecute={() => onGetToolResult(content.tool_id || '')}
               />
             )}
             

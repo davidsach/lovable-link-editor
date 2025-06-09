@@ -7,6 +7,7 @@ import {
   Play, 
   RotateCcw, 
   ArrowLeft, 
+  ArrowRight,
   Upload, 
   Download,
   MessageSquare,
@@ -14,7 +15,9 @@ import {
   AlertTriangle,
   Save,
   Type,
-  Wrench
+  Wrench,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { Sidebar } from '@/components/ToolTrainer/Sidebar';
 import { MessageBuilder } from '@/components/ToolTrainer/MessageBuilder';
@@ -48,8 +51,8 @@ export interface TrainingExample {
 const ToolTrainer = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [currentExample, setCurrentExample] = useState<TrainingExample>({
-    id: 0,
-    name: 'Untitled Example',
+    id: 1,
+    name: 'Example 1',
     description: '',
     messages: [],
     metadata: {
@@ -191,6 +194,37 @@ const ToolTrainer = () => {
     return errors;
   };
 
+  // Navigation functions
+  const navigateToPreviousExample = () => {
+    if (currentExample.id > 1) {
+      setCurrentExample(prev => ({
+        ...prev,
+        id: prev.id - 1,
+        name: `Example ${prev.id - 1}`,
+        messages: [],
+        metadata: {
+          ...prev.metadata,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+      }));
+    }
+  };
+
+  const navigateToNextExample = () => {
+    setCurrentExample(prev => ({
+      ...prev,
+      id: prev.id + 1,
+      name: `Example ${prev.id + 1}`,
+      messages: [],
+      metadata: {
+        ...prev.metadata,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+    }));
+  };
+
   const addNewTurn = () => {
     saveToHistory();
     const messages = currentExample.messages;
@@ -200,7 +234,7 @@ const ToolTrainer = () => {
     const newMessage: Message = {
       id: `msg_${Date.now()}`,
       role: newRole,
-      content: newRole === 'user' ? [{ type: 'text', content: '' }] : []
+      content: [] // Start with empty content array
     };
     
     setCurrentExample(prev => ({
@@ -248,6 +282,18 @@ const ToolTrainer = () => {
     
     // Only allow tool calls for assistant messages
     if (lastMessage.role !== 'assistant') return;
+    
+    // Check if there's a pending tool call without result
+    const hasPendingToolCall = lastMessage.content.some(content => {
+      if (content.type === 'tool_call') {
+        const toolCallIndex = lastMessage.content.findIndex(c => c === content);
+        const nextContent = lastMessage.content[toolCallIndex + 1];
+        return !nextContent || nextContent.type !== 'tool_result';
+      }
+      return false;
+    });
+    
+    if (hasPendingToolCall) return; // Don't allow new tool call until previous one has result
     
     const updatedMessage = {
       ...lastMessage,
@@ -539,7 +585,16 @@ const ToolTrainer = () => {
   
   // Check if user can add text chunk (only if user turn and no text chunk exists)
   const canAddTextChunk = isUserTurn && !lastMessage?.content.some(c => c.type === 'text');
-  const canAddToolCall = isAssistantTurn;
+  
+  // Check if can add tool call (only assistant turn and no pending tool calls)
+  const canAddToolCall = isAssistantTurn && !lastMessage?.content.some(content => {
+    if (content.type === 'tool_call') {
+      const toolCallIndex = lastMessage.content.findIndex(c => c === content);
+      const nextContent = lastMessage.content[toolCallIndex + 1];
+      return !nextContent || nextContent.type !== 'tool_result';
+    }
+    return false;
+  });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex">
@@ -553,6 +608,32 @@ const ToolTrainer = () => {
         <div className="flex-1 overflow-hidden">
           <ScrollArea className="h-full">
             <div className="p-6 max-w-6xl mx-auto pb-32">
+              {/* Navigation Header */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <Button
+                    onClick={navigateToPreviousExample}
+                    disabled={currentExample.id <= 1}
+                    variant="outline"
+                    size="sm"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    Previous
+                  </Button>
+                  <span className="font-medium text-gray-600">
+                    Example ID: {currentExample.id}
+                  </span>
+                  <Button
+                    onClick={navigateToNextExample}
+                    variant="outline"
+                    size="sm"
+                  >
+                    Next
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+
               <ExampleHeader 
                 example={currentExample}
                 onExampleChange={setCurrentExample}
