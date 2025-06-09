@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MessageSquare, User, Bot, Play, Loader2, X, Plus, ArrowLeft, AlertTriangle } from 'lucide-react';
-import { ToolCallEditor } from './ToolCallEditor';
+import { MessageSquare, User, Bot, Play, Loader2, X, AlertTriangle } from 'lucide-react';
+import { ToolCallStep } from './ToolCallStep';
 import { Message } from '../../pages/ToolTrainer';
 
 interface Tool {
@@ -25,7 +25,6 @@ interface MessageBuilderProps {
   availableTools: Tool[];
   isFirstMessage?: boolean;
   isLastMessage?: boolean;
-  onBack?: () => void;
 }
 
 export const MessageBuilder: React.FC<MessageBuilderProps> = ({
@@ -38,7 +37,6 @@ export const MessageBuilder: React.FC<MessageBuilderProps> = ({
   availableTools,
   isFirstMessage = false,
   isLastMessage = false,
-  onBack
 }) => {
   const updateContent = (index: number, newContent: string) => {
     const updatedMessage = {
@@ -61,7 +59,6 @@ export const MessageBuilder: React.FC<MessageBuilderProps> = ({
   };
 
   const removeContent = (index: number) => {
-    if (onBack) onBack();
     const updatedMessage = {
       ...message,
       content: message.content.filter((_, i) => i !== index)
@@ -69,30 +66,8 @@ export const MessageBuilder: React.FC<MessageBuilderProps> = ({
     onUpdate(updatedMessage);
   };
 
-  const addTextChunk = () => {
-    const updatedMessage = {
-      ...message,
-      content: [...message.content, { type: 'text' as const, content: '' }]
-    };
-    onUpdate(updatedMessage);
-  };
-
-  const addToolCall = () => {
-    const updatedMessage = {
-      ...message,
-      content: [...message.content, { 
-        type: 'tool_call' as const, 
-        content: '',
-        tool_name: '',
-        tool_id: `tool_${Date.now()}`
-      }]
-    };
-    onUpdate(updatedMessage);
-  };
-
   // Validation checks
   const hasTextChunk = message.content.some(c => c.type === 'text');
-  const canAddTextChunk = message.role === 'user' && !hasTextChunk;
   const hasEmptyContent = message.content.some(c => !c.content.trim());
   const hasRequiredTextForUser = message.role === 'user' ? hasTextChunk : true;
   const textChunkCount = message.content.filter(c => c.type === 'text').length;
@@ -171,21 +146,6 @@ export const MessageBuilder: React.FC<MessageBuilderProps> = ({
                 {content.type.replace('_', ' ')}
               </Badge>
               <div className="flex items-center gap-1">
-                {index > 0 && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const newContent = [...message.content];
-                      [newContent[index], newContent[index - 1]] = [newContent[index - 1], newContent[index]];
-                      onUpdate({ ...message, content: newContent });
-                    }}
-                    className="h-6 w-6 p-0"
-                  >
-                    <ArrowLeft className="w-3 h-3 rotate-90" />
-                  </Button>
-                )}
                 {message.content.length > 1 && (
                   <Button
                     variant="ghost"
@@ -217,52 +177,14 @@ export const MessageBuilder: React.FC<MessageBuilderProps> = ({
             )}
             
             {content.type === 'tool_call' && (
-              <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
-                <Select
-                  value={content.tool_name || ''}
-                  onValueChange={(value) => updateToolName(index, value)}
-                  required
-                >
-                  <SelectTrigger className={`w-full ${!content.tool_name ? 'border-red-300' : ''}`}>
-                    <SelectValue placeholder="Select a tool..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableTools.map((tool) => (
-                      <SelectItem key={tool.name} value={tool.name}>
-                        <div className="flex flex-col">
-                          <span className="font-medium">{tool.name}</span>
-                          <span className="text-xs text-gray-500">{tool.description}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                
-                <ToolCallEditor
-                  value={content.content}
-                  onChange={(value) => updateContent(index, value)}
-                  className={!content.content.trim() ? 'border-red-300' : ''}
-                />
-                
-                <Button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (content.tool_id) {
-                      onGetToolResult(content.tool_id);
-                    }
-                  }}
-                  disabled={isLoading || !content.tool_name || !content.content.trim()}
-                  size="sm"
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  {isLoading ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Play className="w-4 h-4 mr-2" />
-                  )}
-                  Get Tool Result
-                </Button>
-              </div>
+              <ToolCallStep
+                content={content}
+                availableTools={availableTools}
+                onContentChange={(newContent) => updateContent(index, newContent)}
+                onToolNameChange={(toolName) => updateToolName(index, toolName)}
+                onGetToolResult={onGetToolResult}
+                isLoading={isLoading}
+              />
             )}
             
             {content.type === 'tool_result' && (
@@ -278,44 +200,6 @@ export const MessageBuilder: React.FC<MessageBuilderProps> = ({
             )}
           </div>
         ))}
-
-        {/* Action buttons for selected message */}
-        {isSelected && (
-          <div className="flex gap-2 pt-3 border-t" onClick={(e) => e.stopPropagation()}>
-            {canAddTextChunk && (
-              <Button
-                onClick={addTextChunk}
-                variant="outline"
-                size="sm"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add Text Chunk
-              </Button>
-            )}
-            
-            {message.role === 'assistant' && (
-              <Button
-                onClick={addToolCall}
-                variant="outline"
-                size="sm"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add Tool Call
-              </Button>
-            )}
-            
-            {onBack && (
-              <Button
-                onClick={onBack}
-                variant="outline"
-                size="sm"
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back
-              </Button>
-            )}
-          </div>
-        )}
       </CardContent>
     </Card>
   );

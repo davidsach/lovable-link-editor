@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -13,7 +12,9 @@ import {
   MessageSquare,
   Sparkles,
   AlertTriangle,
-  Save
+  Save,
+  Type,
+  Wrench
 } from 'lucide-react';
 import { Sidebar } from '@/components/ToolTrainer/Sidebar';
 import { MessageBuilder } from '@/components/ToolTrainer/MessageBuilder';
@@ -33,7 +34,7 @@ export interface Message {
 }
 
 export interface TrainingExample {
-  id: string;
+  id: number;
   name: string;
   description: string;
   messages: Message[];
@@ -47,7 +48,7 @@ export interface TrainingExample {
 const ToolTrainer = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [currentExample, setCurrentExample] = useState<TrainingExample>({
-    id: 'new',
+    id: 0,
     name: 'Untitled Example',
     description: '',
     messages: [],
@@ -101,7 +102,7 @@ const ToolTrainer = () => {
     });
 
     return {
-      id: example.id === 'new' ? `example_${Date.now()}` : example.id,
+      id: example.id === 0 ? `example_${Date.now()}` : example.id.toString(),
       name: example.name,
       description: example.description,
       tags: example.metadata.tags,
@@ -212,6 +213,58 @@ const ToolTrainer = () => {
     }));
     
     setSelectedMessageId(newMessage.id);
+  };
+
+  const addTextChunk = () => {
+    if (currentExample.messages.length === 0) return;
+    
+    saveToHistory();
+    const lastMessage = currentExample.messages[currentExample.messages.length - 1];
+    
+    // Check if user can add text chunk (only for user messages and only one allowed)
+    if (lastMessage.role === 'user') {
+      const hasTextChunk = lastMessage.content.some(c => c.type === 'text');
+      if (hasTextChunk) return; // User already has text chunk
+    }
+    
+    const updatedMessage = {
+      ...lastMessage,
+      content: [...lastMessage.content, { type: 'text' as const, content: '' }]
+    };
+    
+    setCurrentExample(prev => ({
+      ...prev,
+      messages: prev.messages.map(msg => 
+        msg.id === lastMessage.id ? updatedMessage : msg
+      )
+    }));
+  };
+
+  const addToolCall = () => {
+    if (currentExample.messages.length === 0) return;
+    
+    saveToHistory();
+    const lastMessage = currentExample.messages[currentExample.messages.length - 1];
+    
+    // Only allow tool calls for assistant messages
+    if (lastMessage.role !== 'assistant') return;
+    
+    const updatedMessage = {
+      ...lastMessage,
+      content: [...lastMessage.content, { 
+        type: 'tool_call' as const, 
+        content: '',
+        tool_name: '',
+        tool_id: `tool_${Date.now()}`
+      }]
+    };
+    
+    setCurrentExample(prev => ({
+      ...prev,
+      messages: prev.messages.map(msg => 
+        msg.id === lastMessage.id ? updatedMessage : msg
+      )
+    }));
   };
 
   const getToolResult = async (toolId: string) => {
@@ -398,11 +451,11 @@ const ToolTrainer = () => {
     try {
       const apiExample = convertToApiFormat(currentExample);
       
-      if (currentExample.id === 'new') {
+      if (currentExample.id === 0) {
         await createExampleMutation.mutateAsync(apiExample);
       } else {
         await updateExampleMutation.mutateAsync({
-          exampleId: currentExample.id,
+          exampleId: currentExample.id.toString(),
           example: apiExample
         });
       }
@@ -442,7 +495,7 @@ const ToolTrainer = () => {
     // Simulate auto-generation
     setTimeout(() => {
       const newExample: TrainingExample = {
-        id: `auto_${Date.now()}`,
+        id: Math.floor(Math.random() * 1000) + 1,
         name: 'Auto-generated Example',
         description: 'Automatically generated training example',
         messages: [
@@ -478,6 +531,15 @@ const ToolTrainer = () => {
 
   const validationErrors = validateMessages();
   const canSubmit = validationErrors.length === 0 && currentExample.messages.length > 0;
+  
+  // Determine current turn and button availability
+  const lastMessage = currentExample.messages[currentExample.messages.length - 1];
+  const isUserTurn = lastMessage?.role === 'user';
+  const isAssistantTurn = lastMessage?.role === 'assistant';
+  
+  // Check if user can add text chunk (only if user turn and no text chunk exists)
+  const canAddTextChunk = isUserTurn && !lastMessage?.content.some(c => c.type === 'text');
+  const canAddToolCall = isAssistantTurn;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex">
@@ -538,7 +600,6 @@ const ToolTrainer = () => {
                       availableTools={availableTools}
                       isFirstMessage={index === 0}
                       isLastMessage={index === currentExample.messages.length - 1}
-                      onBack={goBack}
                     />
                   ))}
                   
@@ -585,6 +646,26 @@ const ToolTrainer = () => {
               >
                 <Plus className="w-4 h-4 mr-2" />
                 New Turn
+              </Button>
+              
+              <Button 
+                onClick={addTextChunk}
+                disabled={!canAddTextChunk}
+                variant="outline"
+                className={`${canAddTextChunk ? 'border-blue-500 text-blue-600 hover:bg-blue-50' : ''}`}
+              >
+                <Type className="w-4 h-4 mr-2" />
+                Add Text Chunk
+              </Button>
+              
+              <Button 
+                onClick={addToolCall}
+                disabled={!canAddToolCall}
+                variant="outline"
+                className={`${canAddToolCall ? 'border-green-500 text-green-600 hover:bg-green-50' : ''}`}
+              >
+                <Wrench className="w-4 h-4 mr-2" />
+                Add Tool Call
               </Button>
               
               <Button 
