@@ -583,8 +583,8 @@ const ToolTrainer = () => {
   const isUserTurn = lastMessage?.role === 'user';
   const isAssistantTurn = lastMessage?.role === 'assistant';
   
-  // Check if user can add text chunk (only if user turn and no text chunk exists)
-  const canAddTextChunk = isUserTurn && !lastMessage?.content.some(c => c.type === 'text');
+  // Text chunk can be added to both user and assistant messages
+  const canAddTextChunk = currentExample.messages.length > 0;
   
   // Check if can add tool call (only assistant turn and no pending tool calls)
   const canAddToolCall = isAssistantTurn && !lastMessage?.content.some(content => {
