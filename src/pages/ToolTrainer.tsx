@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -11,7 +12,8 @@ import {
   Download,
   MessageSquare,
   Sparkles,
-  AlertTriangle
+  AlertTriangle,
+  Save
 } from 'lucide-react';
 import { Sidebar } from '@/components/ToolTrainer/Sidebar';
 import { MessageBuilder } from '@/components/ToolTrainer/MessageBuilder';
@@ -57,6 +59,7 @@ const ToolTrainer = () => {
   });
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [history, setHistory] = useState<Message[][]>([]);
 
   // API hooks
   const { data: tools = [], isLoading: toolsLoading } = useTools();
@@ -64,6 +67,11 @@ const ToolTrainer = () => {
   const createExampleMutation = useCreateExample();
   const updateExampleMutation = useUpdateExample();
   const executeToolMutation = useExecuteTool();
+
+  // Save current state to history
+  const saveToHistory = () => {
+    setHistory(prev => [...prev, currentExample.messages]);
+  };
 
   // Convert messages to API format
   const convertToApiFormat = (example: TrainingExample): CreateExampleRequest => {
@@ -128,7 +136,7 @@ const ToolTrainer = () => {
     }
   ];
 
-  // Validation functions
+  // Enhanced validation functions
   const validateMessages = () => {
     const messages = currentExample.messages;
     const errors = [];
@@ -165,10 +173,25 @@ const ToolTrainer = () => {
       }
     });
 
+    // Check tool calls have tool names and content
+    messages.forEach((msg, msgIndex) => {
+      msg.content.forEach((content, contentIndex) => {
+        if (content.type === 'tool_call') {
+          if (!content.tool_name) {
+            errors.push(`Tool call in message ${msgIndex + 1}, chunk ${contentIndex + 1} missing tool name`);
+          }
+          if (!content.content.trim()) {
+            errors.push(`Tool call in message ${msgIndex + 1}, chunk ${contentIndex + 1} missing parameters`);
+          }
+        }
+      });
+    });
+
     return errors;
   };
 
   const addNewTurn = () => {
+    saveToHistory();
     const messages = currentExample.messages;
     const lastRole = messages.length > 0 ? messages[messages.length - 1].role : 'assistant';
     const newRole = lastRole === 'user' ? 'assistant' : 'user';
@@ -249,6 +272,23 @@ const ToolTrainer = () => {
         }))
       }));
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Tool execution failed';
+      // Add error as tool result
+      setCurrentExample(prev => ({
+        ...prev,
+        messages: prev.messages.map(msg => ({
+          ...msg,
+          content: msg.content.map(content => 
+            content.tool_id === toolId
+              ? content
+              : content
+          ).concat(
+            msg.content.some(content => content.tool_id === toolId) 
+              ? [{ type: 'tool_result' as const, content: `Error: ${errorMessage}` }]
+              : []
+          )
+        }))
+      }));
       console.error('Failed to get tool result:', error);
     }
     
@@ -344,11 +384,13 @@ const ToolTrainer = () => {
   };
 
   const goBack = () => {
-    if (currentExample.messages.length > 0) {
+    if (history.length > 0) {
+      const previousState = history[history.length - 1];
       setCurrentExample(prev => ({
         ...prev,
-        messages: prev.messages.slice(0, -1)
+        messages: previousState
       }));
+      setHistory(prev => prev.slice(0, -1));
     }
   };
 
@@ -483,6 +525,7 @@ const ToolTrainer = () => {
                       isSelected={selectedMessageId === message.id}
                       onSelect={() => setSelectedMessageId(message.id)}
                       onUpdate={(updatedMessage) => {
+                        saveToHistory();
                         setCurrentExample(prev => ({
                           ...prev,
                           messages: prev.messages.map(msg => 
@@ -495,6 +538,7 @@ const ToolTrainer = () => {
                       availableTools={availableTools}
                       isFirstMessage={index === 0}
                       isLastMessage={index === currentExample.messages.length - 1}
+                      onBack={goBack}
                     />
                   ))}
                   
@@ -555,7 +599,7 @@ const ToolTrainer = () => {
               <Button 
                 onClick={goBack}
                 variant="outline"
-                disabled={currentExample.messages.length === 0}
+                disabled={history.length === 0}
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back
@@ -566,8 +610,8 @@ const ToolTrainer = () => {
                 disabled={!canSubmit || createExampleMutation.isPending || updateExampleMutation.isPending}
                 className="bg-purple-600 hover:bg-purple-700 ml-auto"
               >
-                <Download className="w-4 h-4 mr-2" />
-                {createExampleMutation.isPending || updateExampleMutation.isPending ? 'Submitting...' : 'Submit'}
+                <Save className="w-4 h-4 mr-2" />
+                {createExampleMutation.isPending || updateExampleMutation.isPending ? 'Saving...' : 'Save Trace'}
               </Button>
             </div>
           </div>

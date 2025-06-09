@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MessageSquare, User, Bot, Play, Loader2, X, Plus, ArrowLeft } from 'lucide-react';
+import { MessageSquare, User, Bot, Play, Loader2, X, Plus, ArrowLeft, AlertTriangle } from 'lucide-react';
 import { ToolCallEditor } from './ToolCallEditor';
 import { Message } from '../../pages/ToolTrainer';
 
@@ -25,6 +25,7 @@ interface MessageBuilderProps {
   availableTools: Tool[];
   isFirstMessage?: boolean;
   isLastMessage?: boolean;
+  onBack?: () => void;
 }
 
 export const MessageBuilder: React.FC<MessageBuilderProps> = ({
@@ -36,7 +37,8 @@ export const MessageBuilder: React.FC<MessageBuilderProps> = ({
   isLoading,
   availableTools,
   isFirstMessage = false,
-  isLastMessage = false
+  isLastMessage = false,
+  onBack
 }) => {
   const updateContent = (index: number, newContent: string) => {
     const updatedMessage = {
@@ -59,6 +61,7 @@ export const MessageBuilder: React.FC<MessageBuilderProps> = ({
   };
 
   const removeContent = (index: number) => {
+    if (onBack) onBack();
     const updatedMessage = {
       ...message,
       content: message.content.filter((_, i) => i !== index)
@@ -91,6 +94,14 @@ export const MessageBuilder: React.FC<MessageBuilderProps> = ({
   const hasTextChunk = message.content.some(c => c.type === 'text');
   const canAddTextChunk = message.role === 'user' && !hasTextChunk;
   const hasEmptyContent = message.content.some(c => !c.content.trim());
+  const hasRequiredTextForUser = message.role === 'user' ? hasTextChunk : true;
+  const textChunkCount = message.content.filter(c => c.type === 'text').length;
+  const hasMultipleTextChunks = message.role === 'user' && textChunkCount > 1;
+
+  const validationErrors = [];
+  if (hasEmptyContent) validationErrors.push('Empty content not allowed');
+  if (!hasRequiredTextForUser) validationErrors.push('User message must have text');
+  if (hasMultipleTextChunks) validationErrors.push('User can only have one text chunk');
 
   return (
     <Card 
@@ -98,7 +109,7 @@ export const MessageBuilder: React.FC<MessageBuilderProps> = ({
         isSelected 
           ? 'ring-2 ring-blue-500 shadow-lg' 
           : 'hover:shadow-md'
-      } ${hasEmptyContent ? 'border-red-300' : ''}`}
+      } ${validationErrors.length > 0 ? 'border-red-300' : ''}`}
       onClick={onSelect}
     >
       <CardHeader className="pb-3">
@@ -120,18 +131,29 @@ export const MessageBuilder: React.FC<MessageBuilderProps> = ({
                 {isFirstMessage ? 'First' : 'Last'}
               </Badge>
             )}
+            {validationErrors.length > 0 && (
+              <Badge variant="destructive" className="text-xs">
+                <AlertTriangle className="w-3 h-3 mr-1" />
+                {validationErrors.length} Error{validationErrors.length > 1 ? 's' : ''}
+              </Badge>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="text-xs">
               {message.content.length} chunk{message.content.length !== 1 ? 's' : ''}
             </Badge>
-            {hasEmptyContent && (
-              <Badge variant="destructive" className="text-xs">
-                Empty content
-              </Badge>
-            )}
           </div>
         </div>
+        {validationErrors.length > 0 && (
+          <div className="mt-2 space-y-1">
+            {validationErrors.map((error, index) => (
+              <div key={index} className="text-xs text-red-600 flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3" />
+                {error}
+              </div>
+            ))}
+          </div>
+        )}
       </CardHeader>
       
       <CardContent className="space-y-4">
@@ -155,7 +177,6 @@ export const MessageBuilder: React.FC<MessageBuilderProps> = ({
                     size="sm"
                     onClick={(e) => {
                       e.stopPropagation();
-                      // Move content up
                       const newContent = [...message.content];
                       [newContent[index], newContent[index - 1]] = [newContent[index - 1], newContent[index]];
                       onUpdate({ ...message, content: newContent });
@@ -191,6 +212,7 @@ export const MessageBuilder: React.FC<MessageBuilderProps> = ({
                 placeholder="Enter message content..."
                 className={`min-h-[80px] ${!content.content.trim() ? 'border-red-300' : ''}`}
                 onClick={(e) => e.stopPropagation()}
+                required
               />
             )}
             
@@ -199,14 +221,18 @@ export const MessageBuilder: React.FC<MessageBuilderProps> = ({
                 <Select
                   value={content.tool_name || ''}
                   onValueChange={(value) => updateToolName(index, value)}
+                  required
                 >
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger className={`w-full ${!content.tool_name ? 'border-red-300' : ''}`}>
                     <SelectValue placeholder="Select a tool..." />
                   </SelectTrigger>
                   <SelectContent>
                     {availableTools.map((tool) => (
                       <SelectItem key={tool.name} value={tool.name}>
-                        {tool.name}
+                        <div className="flex flex-col">
+                          <span className="font-medium">{tool.name}</span>
+                          <span className="text-xs text-gray-500">{tool.description}</span>
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -215,6 +241,7 @@ export const MessageBuilder: React.FC<MessageBuilderProps> = ({
                 <ToolCallEditor
                   value={content.content}
                   onChange={(value) => updateContent(index, value)}
+                  className={!content.content.trim() ? 'border-red-300' : ''}
                 />
                 
                 <Button
@@ -224,7 +251,7 @@ export const MessageBuilder: React.FC<MessageBuilderProps> = ({
                       onGetToolResult(content.tool_id);
                     }
                   }}
-                  disabled={isLoading}
+                  disabled={isLoading || !content.tool_name || !content.content.trim()}
                   size="sm"
                   className="bg-green-600 hover:bg-green-700"
                 >
@@ -241,9 +268,12 @@ export const MessageBuilder: React.FC<MessageBuilderProps> = ({
             {content.type === 'tool_result' && (
               <div className="bg-green-50 border border-green-200 rounded-lg p-3">
                 <div className="text-sm font-medium text-green-800 mb-2">Tool Result:</div>
-                <pre className="text-sm text-green-700 whitespace-pre-wrap font-mono">
+                <pre className="text-sm text-green-700 whitespace-pre-wrap font-mono max-h-40 overflow-y-auto">
                   {content.content}
                 </pre>
+                {content.content.startsWith('{') && (
+                  <Badge variant="outline" className="text-xs mt-2">JSON Response</Badge>
+                )}
               </div>
             )}
           </div>
@@ -271,6 +301,17 @@ export const MessageBuilder: React.FC<MessageBuilderProps> = ({
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Add Tool Call
+              </Button>
+            )}
+            
+            {onBack && (
+              <Button
+                onClick={onBack}
+                variant="outline"
+                size="sm"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back
               </Button>
             )}
           </div>
