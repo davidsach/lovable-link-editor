@@ -24,6 +24,11 @@ import { MessageBuilder } from '@/components/ToolTrainer/MessageBuilder';
 import { ExampleHeader } from '@/components/ToolTrainer/ExampleHeader';
 import { useTools, useExamples, useCreateExample, useUpdateExample, useExecuteTool } from '@/hooks/useApi';
 import { CreateExampleRequest, Step } from '@/services/api';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
+import { LoadingOverlay } from '@/components/ui/loading-overlay';
+import { ErrorDisplay } from '@/components/ui/error-display';
+import { useErrorHandler } from '@/hooks/useErrorHandler';
+import { validateExampleMetadata } from '@/utils/validation';
 
 export interface Message {
   id: string;
@@ -64,6 +69,21 @@ const ToolTrainer = () => {
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [history, setHistory] = useState<Message[][]>([]);
+  const [confirmationDialog, setConfirmationDialog] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+    action: () => void;
+  }>({
+    open: false,
+    title: '',
+    description: '',
+    action: () => {}
+  });
+  const [executionTimeouts, setExecutionTimeouts] = useState<Record<string, NodeJS.Timeout>>({});
+
+  // Enhanced error handling
+  const { errors, hasErrors, addError, clearErrors } = useErrorHandler();
 
   // API hooks
   const { data: tools = [], isLoading: toolsLoading } = useTools();
@@ -145,27 +165,48 @@ const ToolTrainer = () => {
     const messages = currentExample.messages;
     const errors = [];
 
+    if (messages.length === 0) {
+      errors.push('At least one message is required');
+      return errors;
+    }
+
     // Check if first message is user
-    if (messages.length > 0 && messages[0].role !== 'user') {
+    if (messages[0].role !== 'user') {
       errors.push('First message must be from user');
     }
 
     // Check if last message is assistant
-    if (messages.length > 0 && messages[messages.length - 1].role !== 'assistant') {
+    if (messages[messages.length - 1].role !== 'assistant') {
       errors.push('Last message must be from assistant');
     }
 
-    // Check for empty content
+    // Check for empty content and validate each chunk
     messages.forEach((msg, msgIndex) => {
+      if (msg.content.length === 0) {
+        errors.push(`Message ${msgIndex + 1} has no content chunks`);
+        return;
+      }
+
       msg.content.forEach((messageContent, contentIndex) => {
         if (!messageContent.content.trim()) {
           errors.push(`Message ${msgIndex + 1}, chunk ${contentIndex + 1} is empty`);
         }
-      });
-    });
 
-    // Check user messages have only one text chunk
-    messages.forEach((msg, msgIndex) => {
+        // Validate Python code in tool calls
+        if (messageContent.type === 'tool_call') {
+          if (!messageContent.tool_name) {
+            errors.push(`Message ${msgIndex + 1}, chunk ${contentIndex + 1} missing tool name`);
+          }
+          
+          // Check for unmatched tool calls (tool calls without results)
+          const nextContent = msg.content[contentIndex + 1];
+          if (!nextContent || nextContent.type !== 'tool_result') {
+            errors.push(`Message ${msgIndex + 1}, chunk ${contentIndex + 1} tool call needs execution result`);
+          }
+        }
+      });
+
+      // Check user messages have only one text chunk
       if (msg.role === 'user') {
         const textChunks = msg.content.filter(c => c.type === 'text');
         if (textChunks.length > 1) {
@@ -177,19 +218,9 @@ const ToolTrainer = () => {
       }
     });
 
-    // Check tool calls have tool names and content
-    messages.forEach((msg, msgIndex) => {
-      msg.content.forEach((content, contentIndex) => {
-        if (content.type === 'tool_call') {
-          if (!content.tool_name) {
-            errors.push(`Tool call in message ${msgIndex + 1}, chunk ${contentIndex + 1} missing tool name`);
-          }
-          if (!content.content.trim()) {
-            errors.push(`Tool call in message ${msgIndex + 1}, chunk ${contentIndex + 1} missing parameters`);
-          }
-        }
-      });
-    });
+    // Validate example metadata
+    const metadataValidation = validateExampleMetadata(currentExample.name, currentExample.description);
+    errors.push(...metadataValidation.errors);
 
     return errors;
   };
@@ -226,6 +257,18 @@ const ToolTrainer = () => {
   };
 
   const addNewTurn = () => {
+    if (currentExample.messages.length > 0) {
+      const lastMessage = currentExample.messages[currentExample.messages.length - 1];
+      if (lastMessage.content.some(c => c.type === 'tool_call' && !lastMessage.content.some(content => content.type === 'tool_result'))) {
+        addError({
+          message: 'Please execute pending tool calls before adding a new turn',
+          type: 'warning',
+          field: 'new-turn'
+        });
+        return;
+      }
+    }
+
     saveToHistory();
     const messages = currentExample.messages;
     const lastRole = messages.length > 0 ? messages[messages.length - 1].role : 'assistant';
@@ -234,7 +277,7 @@ const ToolTrainer = () => {
     const newMessage: Message = {
       id: `msg_${Date.now()}`,
       role: newRole,
-      content: [] // Start with empty content array
+      content: []
     };
     
     setCurrentExample(prev => ({
@@ -247,6 +290,7 @@ const ToolTrainer = () => {
     }));
     
     setSelectedMessageId(newMessage.id);
+    clearErrors('new-turn');
   };
 
   const addTextChunk = () => {
@@ -314,7 +358,10 @@ const ToolTrainer = () => {
   };
 
   const getToolResult = async (toolId: string) => {
+    const EXECUTION_TIMEOUT = 30000; // 30 seconds
+    
     setIsLoading(true);
+    clearErrors(`execution-${toolId}`);
     
     // Find the tool call
     const messageWithTool = currentExample.messages.find(msg => 
@@ -323,24 +370,52 @@ const ToolTrainer = () => {
     
     if (!messageWithTool) {
       setIsLoading(false);
+      addError({
+        message: 'Tool call not found',
+        type: 'error',
+        field: `execution-${toolId}`
+      });
       return;
     }
 
     const toolCall = messageWithTool.content.find(messageContent => messageContent.tool_id === toolId);
     if (!toolCall || !toolCall.content.trim()) {
       setIsLoading(false);
+      addError({
+        message: 'Cannot execute empty Python code',
+        type: 'error',
+        field: `execution-${toolId}`
+      });
       return;
     }
 
+    // Set up timeout
+    const timeoutId = setTimeout(() => {
+      setIsLoading(false);
+      addError({
+        message: 'Code execution timed out after 30 seconds',
+        type: 'error',
+        field: `execution-${toolId}`,
+        retryable: true
+      });
+    }, EXECUTION_TIMEOUT);
+
+    setExecutionTimeouts(prev => ({ ...prev, [toolId]: timeoutId }));
+
     try {
-      // For Python code execution, we'll send the code as-is to a Python execution endpoint
-      // This is a simulation - in a real implementation, you'd have a Python execution service
       const result = await executeToolMutation.mutateAsync({
         tool_name: 'python_executor',
         parameters: {
           code: toolCall.content,
           language: 'python'
         }
+      });
+
+      // Clear timeout
+      clearTimeout(timeoutId);
+      setExecutionTimeouts(prev => {
+        const { [toolId]: removed, ...rest } = prev;
+        return rest;
       });
 
       const formattedResult = typeof result.result === 'object' 
@@ -363,8 +438,23 @@ const ToolTrainer = () => {
           )
         }))
       }));
+
+      addError({
+        message: 'Code executed successfully',
+        type: 'info',
+        field: `execution-${toolId}`
+      });
+
     } catch (error) {
+      // Clear timeout
+      clearTimeout(timeoutId);
+      setExecutionTimeouts(prev => {
+        const { [toolId]: removed, ...rest } = prev;
+        return rest;
+      });
+
       const errorMessage = error instanceof Error ? error.message : 'Code execution failed';
+      
       // Add error as tool result
       setCurrentExample(prev => ({
         ...prev,
@@ -381,7 +471,13 @@ const ToolTrainer = () => {
           )
         }))
       }));
-      console.error('Failed to execute Python code:', error);
+
+      addError({
+        message: errorMessage,
+        type: 'error',
+        field: `execution-${toolId}`,
+        retryable: true
+      });
     }
     
     setIsLoading(false);
@@ -480,30 +576,53 @@ const ToolTrainer = () => {
   };
 
   const submitExample = async () => {
-    try {
-      const apiExample = convertToApiFormat(currentExample);
-      
-      if (currentExample.id === 0) {
-        await createExampleMutation.mutateAsync(apiExample);
-      } else {
-        await updateExampleMutation.mutateAsync({
-          exampleId: currentExample.id.toString(),
-          example: apiExample
+    const validationErrors = validateMessages();
+    
+    if (validationErrors.length > 0) {
+      validationErrors.forEach(error => {
+        addError({
+          message: error,
+          type: 'error',
+          field: 'submission'
         });
-      }
-    } catch (error) {
-      console.error('Error submitting example:', error);
-      // Fallback to download if API fails
-      const dataStr = JSON.stringify(currentExample, null, 2);
-      const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-      
-      const exportFileDefaultName = `training_example_${Date.now()}.json`;
-      
-      const linkElement = document.createElement('a');
-      linkElement.setAttribute('href', dataUri);
-      linkElement.setAttribute('download', exportFileDefaultName);
-      linkElement.click();
+      });
+      return;
     }
+
+    setConfirmationDialog({
+      open: true,
+      title: 'Save Training Example',
+      description: `Are you sure you want to save "${currentExample.name}"? This will ${currentExample.id === 0 ? 'create a new' : 'update the existing'} training example.`,
+      action: async () => {
+        try {
+          const apiExample = convertToApiFormat(currentExample);
+          
+          if (currentExample.id === 0) {
+            await createExampleMutation.mutateAsync(apiExample);
+          } else {
+            await updateExampleMutation.mutateAsync({
+              exampleId: currentExample.id.toString(),
+              example: apiExample
+            });
+          }
+          
+          clearErrors('submission');
+          addError({
+            message: 'Training example saved successfully',
+            type: 'info',
+            field: 'submission'
+          });
+        } catch (error) {
+          console.error('Error submitting example:', error);
+          addError({
+            message: 'Failed to save example. Please try again.',
+            type: 'error',
+            field: 'submission',
+            retryable: true
+          });
+        }
+      }
+    });
   };
 
   const loadExample = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -562,7 +681,7 @@ const ToolTrainer = () => {
   };
 
   const validationErrors = validateMessages();
-  const canSubmit = validationErrors.length === 0 && currentExample.messages.length > 0;
+  const canSubmit = validationErrors.length === 0 && currentExample.messages.length > 0 && !hasErrors;
   
   // Determine current turn and button availability
   const lastMessage = currentExample.messages[currentExample.messages.length - 1];
@@ -590,7 +709,7 @@ const ToolTrainer = () => {
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
       />
       
-      <main className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-80'} flex flex-col`}>
+      <main className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-80'} flex flex-col`} role="main">
         <div className="flex-1 overflow-hidden">
           <ScrollArea className="h-full">
             <div className="p-6 max-w-6xl mx-auto pb-32">
@@ -602,6 +721,7 @@ const ToolTrainer = () => {
                     disabled={currentExample.id <= 1}
                     variant="outline"
                     size="sm"
+                    aria-label="Previous example"
                   >
                     <ChevronLeft className="w-4 h-4" />
                     Previous
@@ -613,6 +733,7 @@ const ToolTrainer = () => {
                     onClick={navigateToNextExample}
                     variant="outline"
                     size="sm"
+                    aria-label="Next example"
                   >
                     Next
                     <ChevronRight className="w-4 h-4" />
@@ -628,22 +749,22 @@ const ToolTrainer = () => {
                 isLoading={isLoading || createExampleMutation.isPending || updateExampleMutation.isPending}
               />
               
-              {/* Validation Errors */}
-              {validationErrors.length > 0 && (
-                <Card className="mt-6 border-red-200 bg-red-50">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <AlertTriangle className="w-5 h-5 text-red-600" />
-                      <h3 className="font-medium text-red-800">Validation Errors</h3>
-                    </div>
-                    <ul className="text-sm text-red-700 space-y-1">
-                      {validationErrors.map((error, index) => (
-                        <li key={index}>• {error}</li>
-                      ))}
-                    </ul>
-                  </CardContent>
-                </Card>
-              )}
+              {/* Enhanced Error Display */}
+              <ErrorDisplay 
+                errors={errors}
+                onDismiss={clearErrors}
+                onRetry={(errorId) => {
+                  const error = errors.find(e => e.id === errorId);
+                  if (error?.field?.startsWith('execution-')) {
+                    const toolId = error.field.replace('execution-', '');
+                    getToolResult(toolId);
+                  } else if (error?.field === 'submission') {
+                    submitExample();
+                  }
+                  clearErrors();
+                }}
+                className="mt-6"
+              />
               
               <div className="grid gap-6 mt-6">
                 <div className="space-y-4">
@@ -680,6 +801,7 @@ const ToolTrainer = () => {
                           <Button 
                             onClick={addNewTurn}
                             className="bg-blue-600 hover:bg-blue-700"
+                            aria-label="Add new conversation turn"
                           >
                             <Plus className="w-4 h-4 mr-2" />
                             Add New Turn
@@ -688,6 +810,7 @@ const ToolTrainer = () => {
                             onClick={autoGenerateExample}
                             variant="outline"
                             disabled={isLoading}
+                            aria-label="Auto generate example"
                           >
                             <Sparkles className="w-4 h-4 mr-2" />
                             Auto Generate
@@ -702,14 +825,16 @@ const ToolTrainer = () => {
           </ScrollArea>
         </div>
 
-        {/* Fixed Action Bar */}
+        {/* Enhanced Action Bar with accessibility */}
         <div className="fixed bottom-0 right-0 left-0 bg-white border-t border-gray-200 shadow-lg z-10" 
              style={{ marginLeft: sidebarCollapsed ? '64px' : '320px' }}>
           <div className="p-4 max-w-6xl mx-auto">
             <div className="flex flex-wrap gap-3 items-center">
+              {/* ... keep existing action buttons with enhanced accessibility */}
               <Button 
                 onClick={addNewTurn}
                 className="bg-blue-600 hover:bg-blue-700"
+                aria-label="Add new conversation turn"
               >
                 <Plus className="w-4 h-4 mr-2" />
                 New Turn
@@ -757,6 +882,7 @@ const ToolTrainer = () => {
                 onClick={submitExample}
                 disabled={!canSubmit || createExampleMutation.isPending || updateExampleMutation.isPending}
                 className="bg-purple-600 hover:bg-purple-700 ml-auto"
+                aria-label="Save training example"
               >
                 <Save className="w-4 h-4 mr-2" />
                 {createExampleMutation.isPending || updateExampleMutation.isPending ? 'Saving...' : 'Save Trace'}
@@ -764,6 +890,18 @@ const ToolTrainer = () => {
             </div>
           </div>
         </div>
+
+        {/* Confirmation Dialog */}
+        <ConfirmationDialog
+          open={confirmationDialog.open}
+          onOpenChange={(open) => setConfirmationDialog(prev => ({ ...prev, open }))}
+          title={confirmationDialog.title}
+          description={confirmationDialog.description}
+          onConfirm={() => {
+            confirmationDialog.action();
+            setConfirmationDialog(prev => ({ ...prev, open: false }));
+          }}
+        />
       </main>
     </div>
   );
