@@ -11,6 +11,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { AlertTriangle, Trash2, RefreshCw } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface ConfirmationDialogProps {
   open: boolean;
@@ -44,8 +45,10 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
     }
   };
 
-  const getActionVariant = () => {
-    return variant === 'destructive' ? 'destructive' : 'default';
+  const getActionClassName = () => {
+    return variant === 'destructive' 
+      ? 'bg-red-600 hover:bg-red-700 text-white' 
+      : '';
   };
 
   return (
@@ -64,7 +67,7 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
           <AlertDialogCancel>{cancelText}</AlertDialogCancel>
           <AlertDialogAction
             onClick={onConfirm}
-            variant={getActionVariant()}
+            className={cn(getActionClassName())}
           >
             {confirmText}
           </AlertDialogAction>
