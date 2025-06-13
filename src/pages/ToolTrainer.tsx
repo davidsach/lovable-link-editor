@@ -29,6 +29,9 @@ import { LoadingOverlay } from '@/components/ui/loading-overlay';
 import { ErrorDisplay } from '@/components/ui/error-display';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
 import { validateExampleMetadata } from '@/utils/validation';
+import { SaveConversationDialog } from '@/components/ToolTrainer/SaveConversationDialog';
+import { SavedConversations } from '@/components/ToolTrainer/SavedConversations';
+import { conversationService, SavedConversation } from '@/services/conversationService';
 
 export interface Message {
   id: string;
@@ -91,6 +94,21 @@ const ToolTrainer = () => {
   const createExampleMutation = useCreateExample();
   const updateExampleMutation = useUpdateExample();
   const executeToolMutation = useExecuteTool();
+
+  // Add new function to load saved conversation
+  const loadSavedConversation = (conversation: SavedConversation) => {
+    setCurrentExample({
+      id: parseInt(conversation.id.replace('conv_', '')) || 1,
+      name: conversation.name,
+      description: conversation.description,
+      messages: conversation.messages,
+      metadata: {
+        created_at: conversation.createdAt,
+        updated_at: conversation.updatedAt,
+        tags: []
+      }
+    });
+  };
 
   // Save current state to history
   const saveToHistory = () => {
@@ -382,7 +400,7 @@ const ToolTrainer = () => {
     if (!toolCall || !toolCall.content.trim()) {
       setIsLoading(false);
       addError({
-        message: 'Cannot execute empty Python code',
+        message: 'Python code cannot be empty',
         type: 'error',
         field: `execution-${toolId}`
       });
@@ -403,12 +421,10 @@ const ToolTrainer = () => {
     setExecutionTimeouts(prev => ({ ...prev, [toolId]: timeoutId }));
 
     try {
-      const result = await executeToolMutation.mutateAsync({
-        tool_name: 'python_executor',
-        parameters: {
-          code: toolCall.content,
-          language: 'python'
-        }
+      // Use your backend API instead of the default one
+      const result = await conversationService.executePythonCode({
+        code: toolCall.content,
+        language: 'python'
       });
 
       // Clear timeout
@@ -418,32 +434,58 @@ const ToolTrainer = () => {
         return rest;
       });
 
-      const formattedResult = typeof result.result === 'object' 
-        ? JSON.stringify(result.result, null, 2)
-        : String(result.result);
+      if (result.status === 'error') {
+        // Add error as tool result
+        setCurrentExample(prev => ({
+          ...prev,
+          messages: prev.messages.map(msg => ({
+            ...msg,
+            content: msg.content.map(content => 
+              content.tool_id === toolId
+                ? content
+                : content
+            ).concat(
+              msg.content.some(content => content.tool_id === toolId) 
+                ? [{ type: 'tool_result' as const, content: `Error: ${result.error}` }]
+                : []
+            )
+          }))
+        }));
 
-      // Add tool result after the tool call
-      setCurrentExample(prev => ({
-        ...prev,
-        messages: prev.messages.map(msg => ({
-          ...msg,
-          content: msg.content.map(content => 
-            content.tool_id === toolId
-              ? content
-              : content
-          ).concat(
-            msg.content.some(content => content.tool_id === toolId) 
-              ? [{ type: 'tool_result' as const, content: formattedResult }]
-              : []
-          )
-        }))
-      }));
+        addError({
+          message: result.error || 'Code execution failed',
+          type: 'error',
+          field: `execution-${toolId}`,
+          retryable: true
+        });
+      } else {
+        const formattedResult = typeof result.result === 'object' 
+          ? JSON.stringify(result.result, null, 2)
+          : String(result.result);
 
-      addError({
-        message: 'Code executed successfully',
-        type: 'info',
-        field: `execution-${toolId}`
-      });
+        // Add tool result after the tool call
+        setCurrentExample(prev => ({
+          ...prev,
+          messages: prev.messages.map(msg => ({
+            ...msg,
+            content: msg.content.map(content => 
+              content.tool_id === toolId
+                ? content
+                : content
+            ).concat(
+              msg.content.some(content => content.tool_id === toolId) 
+                ? [{ type: 'tool_result' as const, content: formattedResult }]
+                : []
+            )
+          }))
+        }));
+
+        addError({
+          message: 'Code executed successfully',
+          type: 'info',
+          field: `execution-${toolId}`
+        });
+      }
 
     } catch (error) {
       // Clear timeout
@@ -739,6 +781,15 @@ const ToolTrainer = () => {
                     <ChevronRight className="w-4 h-4" />
                   </Button>
                 </div>
+                
+                {/* Add Save and Load functionality */}
+                <div className="flex items-center gap-3">
+                  <SavedConversations onLoadConversation={loadSavedConversation} />
+                  <SaveConversationDialog 
+                    messages={currentExample.messages}
+                    exampleName={currentExample.name}
+                  />
+                </div>
               </div>
 
               <ExampleHeader 
@@ -830,7 +881,6 @@ const ToolTrainer = () => {
              style={{ marginLeft: sidebarCollapsed ? '64px' : '320px' }}>
           <div className="p-4 max-w-6xl mx-auto">
             <div className="flex flex-wrap gap-3 items-center">
-              {/* ... keep existing action buttons with enhanced accessibility */}
               <Button 
                 onClick={addNewTurn}
                 className="bg-blue-600 hover:bg-blue-700"
@@ -877,6 +927,12 @@ const ToolTrainer = () => {
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back
               </Button>
+              
+              {/* Add save button in the action bar too */}
+              <SaveConversationDialog 
+                messages={currentExample.messages}
+                exampleName={currentExample.name}
+              />
               
               <Button 
                 onClick={submitExample}
