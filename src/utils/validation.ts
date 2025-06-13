@@ -22,14 +22,14 @@ export const validatePythonCode = (code: string): PythonValidationResult => {
     return { isValid: false, errors, warnings, syntaxErrors };
   }
 
-  // Check for potentially unsafe operations
+  // Check for potentially unsafe operations with friendlier messages
   const unsafePatterns = [
-    { pattern: /import\s+os/, message: 'OS module access is restricted for security' },
-    { pattern: /import\s+subprocess/, message: 'Subprocess module is not allowed' },
-    { pattern: /exec\s*\(/, message: 'Dynamic code execution (exec) is not allowed' },
-    { pattern: /eval\s*\(/, message: 'Dynamic code evaluation (eval) is not allowed' },
+    { pattern: /import\s+os/, message: 'OS module access is not allowed for security reasons' },
+    { pattern: /import\s+subprocess/, message: 'Subprocess module is not allowed for security reasons' },
+    { pattern: /exec\s*\(/, message: 'Dynamic code execution is not allowed' },
+    { pattern: /eval\s*\(/, message: 'Dynamic code evaluation is not allowed' },
     { pattern: /open\s*\(/, message: 'File operations may be restricted' },
-    { pattern: /while\s+True\s*:/, message: 'Infinite loops are not recommended' },
+    { pattern: /while\s+True\s*:/, message: 'Infinite loops should be avoided' },
   ];
 
   const lines = code.split('\n');
@@ -56,7 +56,7 @@ export const validatePythonCode = (code: string): PythonValidationResult => {
         } else {
           syntaxErrors.push({
             line: index + 1,
-            message: `Unmatched closing bracket '${char}'`
+            message: `Missing opening bracket for '${char}'`
           });
         }
       }
@@ -68,7 +68,7 @@ export const validatePythonCode = (code: string): PythonValidationResult => {
     if (count > 0) {
       syntaxErrors.push({
         line: lines.length,
-        message: `Unmatched opening bracket '${bracket}'`
+        message: `Missing closing bracket for '${bracket}'`
       });
     }
   });

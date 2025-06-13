@@ -3,11 +3,10 @@ import React, { useState, useEffect } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertTriangle, CheckCircle, Info, HelpCircle } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { validatePythonCode, PythonValidationResult } from '@/utils/validation';
-import { ErrorDisplay } from '@/components/ui/error-display';
-import { useErrorHandler } from '@/hooks/useErrorHandler';
 
 interface ToolCallEditorProps {
   value: string;
@@ -29,42 +28,12 @@ export const ToolCallEditor: React.FC<ToolCallEditorProps> = ({
     syntaxErrors: [] 
   });
   const [showHelp, setShowHelp] = useState(false);
-  const { errors, addError, clearErrors } = useErrorHandler();
 
   useEffect(() => {
     const result = validatePythonCode(value);
     setValidation(result);
     onValidationChange?.(result.isValid);
-    
-    // Clear previous validation errors
-    clearErrors('python-code');
-    
-    // Add new validation errors
-    result.errors.forEach(error => {
-      addError({
-        message: error,
-        type: 'error',
-        field: 'python-code'
-      });
-    });
-    
-    result.syntaxErrors.forEach(syntaxError => {
-      addError({
-        message: syntaxError.message,
-        type: 'error',
-        field: 'python-code',
-        line: syntaxError.line
-      });
-    });
-    
-    result.warnings.forEach(warning => {
-      addError({
-        message: warning,
-        type: 'warning',
-        field: 'python-code'
-      });
-    });
-  }, [value, onValidationChange, addError, clearErrors]);
+  }, [value, onValidationChange]);
 
   const handleChange = (newValue: string) => {
     onChange(newValue);
@@ -85,6 +54,9 @@ export const ToolCallEditor: React.FC<ToolCallEditorProps> = ({
 
   const status = getValidationStatus();
   const StatusIcon = status.icon;
+
+  const allErrors = [...validation.errors, ...validation.syntaxErrors.map(e => e.message)];
+  const hasErrors = allErrors.length > 0;
 
   return (
     <TooltipProvider>
@@ -149,7 +121,7 @@ try:
 except Exception as e:
     print("Error:", str(e))`}
             className={`font-mono text-sm min-h-[200px] bg-gray-50 border-gray-300 resize-y ${
-              validation.errors.length > 0 || validation.syntaxErrors.length > 0 
+              hasErrors
                 ? 'border-red-300 focus:border-red-500' 
                 : validation.warnings.length > 0 
                 ? 'border-yellow-300 focus:border-yellow-500'
@@ -161,11 +133,37 @@ except Exception as e:
           />
         </div>
 
-        <ErrorDisplay 
-          errors={errors.filter(e => e.field === 'python-code')}
-          onDismiss={clearErrors}
-          className="mt-2"
-        />
+        {/* Clear Error Messages */}
+        {hasErrors && (
+          <Alert variant="destructive" className="mt-2">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              <div className="space-y-1">
+                {allErrors.map((error, index) => (
+                  <div key={index} className="text-sm">
+                    {error}
+                  </div>
+                ))}
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Warning Messages */}
+        {validation.warnings.length > 0 && !hasErrors && (
+          <Alert className="mt-2 border-yellow-300 bg-yellow-50">
+            <AlertTriangle className="h-4 w-4 text-yellow-600" />
+            <AlertDescription>
+              <div className="space-y-1">
+                {validation.warnings.map((warning, index) => (
+                  <div key={index} className="text-sm text-yellow-800">
+                    {warning}
+                  </div>
+                ))}
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
 
         <div className="text-xs text-gray-500" id="python-code-help">
           Write Python code that will be executed safely. Results will be captured and displayed below.
