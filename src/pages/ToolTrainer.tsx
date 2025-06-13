@@ -300,7 +300,7 @@ const ToolTrainer = () => {
       content: [...lastMessage.content, { 
         type: 'tool_call' as const, 
         content: '',
-        tool_name: '',
+        tool_name: 'python_executor',
         tool_id: `tool_${Date.now()}`
       }]
     };
@@ -327,27 +327,20 @@ const ToolTrainer = () => {
     }
 
     const toolCall = messageWithTool.content.find(messageContent => messageContent.tool_id === toolId);
-    if (!toolCall || !toolCall.tool_name) {
+    if (!toolCall || !toolCall.content.trim()) {
       setIsLoading(false);
       return;
     }
 
     try {
-      // Try to parse parameters from tool call content
-      let parameters = {};
-      try {
-        // Simple parameter extraction from tool call content
-        const paramMatch = toolCall.content.match(/\{[\s\S]*\}/);
-        if (paramMatch) {
-          parameters = JSON.parse(paramMatch[0]);
-        }
-      } catch (e) {
-        console.warn('Could not parse parameters from tool call');
-      }
-
+      // For Python code execution, we'll send the code as-is to a Python execution endpoint
+      // This is a simulation - in a real implementation, you'd have a Python execution service
       const result = await executeToolMutation.mutateAsync({
-        tool_name: toolCall.tool_name,
-        parameters
+        tool_name: 'python_executor',
+        parameters: {
+          code: toolCall.content,
+          language: 'python'
+        }
       });
 
       const formattedResult = typeof result.result === 'object' 
@@ -371,7 +364,7 @@ const ToolTrainer = () => {
         }))
       }));
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Tool execution failed';
+      const errorMessage = error instanceof Error ? error.message : 'Code execution failed';
       // Add error as tool result
       setCurrentExample(prev => ({
         ...prev,
@@ -388,7 +381,7 @@ const ToolTrainer = () => {
           )
         }))
       }));
-      console.error('Failed to get tool result:', error);
+      console.error('Failed to execute Python code:', error);
     }
     
     setIsLoading(false);
@@ -402,7 +395,7 @@ const ToolTrainer = () => {
     
     currentExample.messages.forEach(msg => {
       msg.content.forEach((messageContent, index) => {
-        if (messageContent.type === 'tool_call' && messageContent.tool_name && messageContent.tool_id) {
+        if (messageContent.type === 'tool_call' && messageContent.content.trim() && messageContent.tool_id) {
           toolCalls.push({
             messageId: msg.id,
             contentIndex: index,
@@ -413,23 +406,16 @@ const ToolTrainer = () => {
     });
 
     try {
-      // Execute all tool calls
+      // Execute all tool calls (Python code)
       const results = await Promise.all(
         toolCalls.map(async ({ toolCall }) => {
           try {
-            let parameters = {};
-            try {
-              const paramMatch = toolCall.content.match(/\{[\s\S]*\}/);
-              if (paramMatch) {
-                parameters = JSON.parse(paramMatch[0]);
-              }
-            } catch (e) {
-              console.warn('Could not parse parameters from tool call');
-            }
-
             const result = await executeToolMutation.mutateAsync({
-              tool_name: toolCall.tool_name,
-              parameters
+              tool_name: 'python_executor',
+              parameters: {
+                code: toolCall.content,
+                language: 'python'
+              }
             });
 
             return {
@@ -476,7 +462,7 @@ const ToolTrainer = () => {
         }))
       }));
     } catch (error) {
-      console.error('Failed to get all tool results:', error);
+      console.error('Failed to execute all Python code:', error);
     }
     
     setIsLoading(false);
@@ -746,7 +732,7 @@ const ToolTrainer = () => {
                 className={`${canAddToolCall ? 'border-green-500 text-green-600 hover:bg-green-50' : ''}`}
               >
                 <Wrench className="w-4 h-4 mr-2" />
-                Add Tool Call
+                Add Python Code
               </Button>
               
               <Button 
@@ -755,7 +741,7 @@ const ToolTrainer = () => {
                 className="bg-green-600 hover:bg-green-700"
               >
                 <Play className="w-4 h-4 mr-2" />
-                Get All Results
+                Execute All Code
               </Button>
               
               <Button 

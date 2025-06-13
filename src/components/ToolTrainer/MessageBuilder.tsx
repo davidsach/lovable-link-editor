@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MessageSquare, User, Bot, Play, Loader2, X, AlertTriangle } from 'lucide-react';
-import { ToolCallStep } from './ToolCallStep';
+import { ToolCallEditor } from './ToolCallEditor';
 import { Message } from '../../pages/ToolTrainer';
 
 interface Tool {
@@ -177,23 +177,36 @@ export const MessageBuilder: React.FC<MessageBuilderProps> = ({
             )}
             
             {content.type === 'tool_call' && (
-              <ToolCallStep
-                stepIndex={index}
-                toolName={content.tool_name || ''}
-                parameters={{}}
-                toolResult=""
-                availableTools={availableTools}
-                onToolNameChange={(toolName) => updateToolName(index, toolName)}
-                onParametersChange={() => {}}
-                onToolResultChange={() => {}}
-                onDelete={() => removeContent(index)}
-                onExecute={() => onGetToolResult(content.tool_id || '')}
-              />
+              <div className="space-y-4">
+                <ToolCallEditor
+                  value={content.content}
+                  onChange={(newCode) => updateContent(index, newCode)}
+                  className="mb-4"
+                />
+                
+                <div className="flex gap-2">
+                  <Button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onGetToolResult(content.tool_id || '');
+                    }}
+                    disabled={isLoading || !content.content.trim()}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    {isLoading ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Play className="w-4 h-4 mr-2" />
+                    )}
+                    Execute Code
+                  </Button>
+                </div>
+              </div>
             )}
             
             {content.type === 'tool_result' && (
               <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                <div className="text-sm font-medium text-green-800 mb-2">Tool Result:</div>
+                <div className="text-sm font-medium text-green-800 mb-2">Execution Result:</div>
                 <pre className="text-sm text-green-700 whitespace-pre-wrap font-mono max-h-40 overflow-y-auto">
                   {content.content}
                 </pre>
