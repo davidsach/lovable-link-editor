@@ -155,6 +155,7 @@ const ToolTrainer = () => {
   const [currentExampleId, setCurrentExampleId] = useState(1);
   const [hasAddedTextChunk, setHasAddedTextChunk] = useState(false);
   const [showTextChunkInput, setShowTextChunkInput] = useState(false);
+  const [conversationStarted, setConversationStarted] = useState(false);
 
   const { data: tools, isLoading: toolsLoading, error: toolsError } = useTools();
   const executeToolMutation = useExecuteToolResult();
@@ -203,6 +204,11 @@ const ToolTrainer = () => {
         ...prev,
         messages: [...prev.messages, newMessage]
       }));
+      
+      // Mark conversation as started when first message is added
+      if (!conversationStarted) {
+        setConversationStarted(true);
+      }
       
       setMessageContent('');
       setShowTextChunkInput(false);
@@ -278,6 +284,14 @@ const ToolTrainer = () => {
 
   const navigateNext = () => {
     setCurrentExampleId(currentExampleId + 1);
+  };
+
+  // Check if new turn can be started
+  const canStartNewTurn = () => {
+    return conversationStarted && (
+      (currentStep === 'user' && hasAddedTextChunk) ||
+      (currentStep === 'assistant' && (hasAddedTextChunk || toolCalls.length > 0))
+    );
   };
 
   // Check if user can add text chunk (only once per turn for user)
@@ -392,11 +406,11 @@ const ToolTrainer = () => {
             </div>
             
             <div className="flex items-center gap-3">
-              <Button variant="outline" size="sm" className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600">
+              <Button variant="outline" size="sm" className="bg-gray-700 border-gray-500 text-white hover:bg-gray-500">
                 <BookOpen className="w-4 h-4 mr-2" />
                 Saved Conversations (0)
               </Button>
-              <Button variant="outline" size="sm" className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600">
+              <Button variant="outline" size="sm" className="bg-gray-700 border-gray-500 text-white hover:bg-gray-500">
                 <Save className="w-4 h-4 mr-2" />
                 Save Conversation
               </Button>
@@ -493,30 +507,49 @@ const ToolTrainer = () => {
           </Card>
         </div>
 
-        {/* Main Content Area - Split between conversation and current step */}
-        <div className="flex-1 flex">
-          {/* Conversation History - Left Side */}
-          <div className="flex-1 flex flex-col bg-gray-900">
+        {/* Main Content Area - Full width conversation */}
+        <div className="flex-1 flex flex-col bg-gray-900">
+          {/* Conversation Area */}
+          <div className="flex-1 flex flex-col">
             <div className="p-4 border-b border-gray-700">
-              <h3 className="text-lg font-semibold text-white flex items-center">
-                <Bot className="w-5 h-5 mr-2 text-blue-400" />
-                Conversation History
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-white flex items-center">
+                  <Bot className="w-5 h-5 mr-2 text-blue-400" />
+                  Conversation
+                </h3>
+                <div className="flex items-center gap-2">
+                  {currentStep === 'user' ? (
+                    <>
+                      <User className="w-5 h-5 text-blue-400" />
+                      <span className="font-medium text-white">User Turn</span>
+                    </>
+                  ) : (
+                    <>
+                      <Bot className="w-5 h-5 text-green-400" />
+                      <span className="font-medium text-white">Assistant Turn</span>
+                    </>
+                  )}
+                  <Badge variant="outline" className="bg-blue-600 text-white border-blue-500">
+                    Current
+                  </Badge>
+                </div>
+              </div>
             </div>
             
-            <ScrollArea className="flex-1 p-4">
+            {/* Conversation Messages */}
+            <ScrollArea className="flex-1 p-6">
               {conversation.messages.length === 0 ? (
                 <div className="flex items-center justify-center h-full text-gray-500">
                   <div className="text-center">
                     <Bot className="w-12 h-12 mx-auto mb-4 text-gray-600" />
                     <p className="text-lg mb-2">No messages yet</p>
-                    <p className="text-sm">Start the conversation by adding a text chunk</p>
+                    <p className="text-sm">User must start the conversation by adding a text chunk</p>
                   </div>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-6 max-w-4xl mx-auto">
                   {conversation.messages.map((message, index) => (
-                    <div key={message.id} className="flex flex-col space-y-2">
+                    <div key={message.id} className="flex flex-col space-y-3">
                       <div className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[80%] rounded-lg p-4 ${
                           message.role === 'user' 
@@ -540,10 +573,10 @@ const ToolTrainer = () => {
                       
                       {/* Show tool calls for assistant messages */}
                       {message.role === 'assistant' && index === conversation.messages.length - 1 && toolCalls.length > 0 && (
-                        <div className="ml-8 space-y-2">
+                        <div className="ml-8 space-y-3">
                           {toolCalls.map((toolCall) => (
-                            <div key={toolCall.id} className="bg-gray-800 rounded-lg p-3 border border-gray-600">
-                              <div className="flex items-center gap-2 mb-2">
+                            <div key={toolCall.id} className="bg-gray-800 rounded-lg p-4 border border-gray-600">
+                              <div className="flex items-center gap-2 mb-3">
                                 <Settings className="w-4 h-4 text-green-400" />
                                 <span className="text-sm font-medium text-green-400">
                                   Tool Call: {toolCall.toolName || 'Unknown'}
@@ -556,7 +589,7 @@ const ToolTrainer = () => {
                                 </Badge>
                               </div>
                               {toolCall.result && (
-                                <pre className="text-xs text-gray-300 bg-gray-900 p-2 rounded overflow-x-auto">
+                                <pre className="text-xs text-gray-300 bg-gray-900 p-3 rounded overflow-x-auto">
                                   {toolCall.result}
                                 </pre>
                               )}
@@ -569,36 +602,15 @@ const ToolTrainer = () => {
                 </div>
               )}
             </ScrollArea>
-          </div>
 
-          {/* Current Step Editor - Right Side */}
-          <div className="w-96 border-l border-gray-700 bg-gray-800 flex flex-col">
-            <div className="p-4 border-b border-gray-700">
-              <div className="flex items-center gap-2 mb-2">
-                {currentStep === 'user' ? (
-                  <User className="w-5 h-5 text-blue-400" />
-                ) : (
-                  <Bot className="w-5 h-5 text-green-400" />
-                )}
-                <span className="font-medium text-white capitalize">{currentStep}</span>
-                <Badge variant="outline" className="bg-blue-600 text-white border-blue-500">
-                  Current
-                </Badge>
-              </div>
-              {currentStep === 'user' && hasAddedTextChunk && (
-                <Badge variant="default" className="bg-green-600 text-white">
-                  <CheckCircle className="w-3 h-3 mr-1" />
-                  Text Added
-                </Badge>
-              )}
-            </div>
-
-            <ScrollArea className="flex-1 p-4">
-              {/* Text Chunk Input */}
-              {showTextChunkInput && (
-                <div className="space-y-3 mb-4">
+            {/* Text Chunk Input Area - Shows when adding text */}
+            {showTextChunkInput && (
+              <div className="border-t border-gray-700 bg-gray-800 p-4">
+                <div className="max-w-4xl mx-auto space-y-3">
                   <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium text-gray-300">Message Content</label>
+                    <label className="text-sm font-medium text-gray-300">
+                      {currentStep === 'user' ? 'User Message' : 'Assistant Message'}
+                    </label>
                     <Button 
                       onClick={() => setShowTextChunkInput(false)}
                       variant="ghost"
@@ -611,194 +623,194 @@ const ToolTrainer = () => {
                   <Textarea
                     value={messageContent}
                     onChange={(e) => setMessageContent(e.target.value)}
-                    placeholder="Enter your message content..."
+                    placeholder={`Enter ${currentStep} message content...`}
                     className="min-h-[100px] bg-gray-700 border-gray-600 text-white"
+                    autoFocus
                   />
                   <Button 
                     onClick={addTextChunk}
                     disabled={!messageContent.trim()}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
+                    className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
                   >
                     <Plus className="w-4 h-4 mr-2" />
                     Add Text Chunk
                   </Button>
                 </div>
-              )}
+              </div>
+            )}
 
-              {/* Tool Calls */}
-              {toolCalls.map((toolCall, index) => (
-                <div key={toolCall.id} className="space-y-3 border-t border-gray-600 pt-3 mt-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm font-medium text-gray-300">Tool Call {index + 1}</label>
-                      <Badge 
-                        variant={toolCall.status === 'completed' ? 'default' : toolCall.status === 'failed' ? 'destructive' : 'outline'}
-                        className="text-xs"
+            {/* Tool Call Editors - Shows for assistant turn */}
+            {currentStep === 'assistant' && toolCalls.length > 0 && (
+              <div className="border-t border-gray-700 bg-gray-800 p-4">
+                <div className="max-w-4xl mx-auto space-y-4">
+                  <h4 className="text-sm font-medium text-gray-300">Tool Calls</h4>
+                  {toolCalls.map((toolCall, index) => (
+                    <div key={toolCall.id} className="bg-gray-700 rounded-lg p-4 border border-gray-600">
+                      <div className="flex items-center gap-2 mb-2">
+                        <label className="text-xs text-gray-400">Tool Call {index + 1}</label>
+                        <Badge 
+                          variant={toolCall.status === 'completed' ? 'default' : toolCall.status === 'failed' ? 'destructive' : 'outline'}
+                          className="text-xs"
+                        >
+                          {toolCall.status === 'executing' && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
+                          {toolCall.status === 'completed' && <CheckCircle className="w-3 h-3 mr-1" />}
+                          {toolCall.status === 'failed' && <AlertTriangle className="w-3 h-3 mr-1" />}
+                          {toolCall.status}
+                        </Badge>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <label className="text-xs text-gray-400">Tool Name</label>
+                          <Select 
+                            value={toolCall.toolName} 
+                            onValueChange={(value) => updateToolCall(index, { toolName: value })}
+                          >
+                            <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
+                              <SelectValue placeholder="Select tool..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableTools.map((tool) => (
+                                <SelectItem key={tool.tool_name} value={tool.tool_name}>
+                                  {tool.tool_name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <label className="text-xs text-gray-400">Parameters (JSON)</label>
+                          <Input
+                            value={JSON.stringify(toolCall.parameters)}
+                            onChange={(e) => {
+                              try {
+                                const params = JSON.parse(e.target.value);
+                                updateToolCall(index, { parameters: params });
+                              } catch {}
+                            }}
+                            placeholder='{"param": "value"}'
+                            className="bg-gray-700 border-gray-600 text-white"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <label className="text-xs text-gray-400">Python Code *</label>
+                        <Textarea
+                          value={toolCall.pythonCode}
+                          onChange={(e) => updateToolCall(index, { pythonCode: e.target.value })}
+                          placeholder="# Write Python code here&#10;import requests&#10;import json&#10;&#10;# Your code here..."
+                          className="min-h-[120px] bg-gray-700 border-gray-600 text-white font-mono text-sm"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <label className="text-xs text-gray-400">Tool Result</label>
+                        <Textarea
+                          value={toolCall.result}
+                          onChange={(e) => updateToolCall(index, { result: e.target.value })}
+                          placeholder="Tool result will appear here after execution..."
+                          className="min-h-[80px] bg-gray-700 border-gray-600 text-white font-mono text-sm"
+                          readOnly
+                        />
+                      </div>
+                      
+                      <Button 
+                        onClick={() => executeToolCall(index)}
+                        disabled={!toolCall.pythonCode.trim() || toolCall.status === 'executing' || toolCall.status === 'completed'}
+                        className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
                       >
-                        {toolCall.status === 'executing' && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
-                        {toolCall.status === 'completed' && <CheckCircle className="w-3 h-3 mr-1" />}
-                        {toolCall.status === 'failed' && <AlertTriangle className="w-3 h-3 mr-1" />}
-                        {toolCall.status}
-                      </Badge>
+                        {toolCall.status === 'executing' ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : toolCall.status === 'completed' ? (
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                        ) : (
+                          <Play className="w-4 h-4 mr-2" />
+                        )}
+                        {toolCall.status === 'executing' ? 'Executing...' : toolCall.status === 'completed' ? 'Executed' : 'Get Result'}
+                      </Button>
                     </div>
+                  ))}
+                  
+                  {/* Execute All Button */}
+                  {toolCalls.length > 1 && getPendingToolCallsCount() > 0 && (
                     <Button 
-                      onClick={() => removeToolCall(index)}
-                      variant="ghost"
-                      size="sm"
-                      className="text-red-400 hover:text-red-300"
+                      onClick={executeAllToolCalls}
+                      disabled={executeToolMutation.isPending}
+                      className="bg-purple-600 hover:bg-purple-700 text-white"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      {executeToolMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <PlayCircle className="w-4 h-4 mr-2" />
+                      )}
+                      Get All Results ({getPendingToolCallsCount()})
                     </Button>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <label className="text-xs text-gray-400">Tool Name</label>
-                      <Select 
-                        value={toolCall.toolName} 
-                        onValueChange={(value) => updateToolCall(index, { toolName: value })}
-                      >
-                        <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
-                          <SelectValue placeholder="Select tool..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {availableTools.map((tool) => (
-                            <SelectItem key={tool.tool_name} value={tool.tool_name}>
-                              {tool.tool_name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <label className="text-xs text-gray-400">Parameters (JSON)</label>
-                      <Input
-                        value={JSON.stringify(toolCall.parameters)}
-                        onChange={(e) => {
-                          try {
-                            const params = JSON.parse(e.target.value);
-                            updateToolCall(index, { parameters: params });
-                          } catch {}
-                        }}
-                        placeholder='{"param": "value"}'
-                        className="bg-gray-700 border-gray-600 text-white"
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <label className="text-xs text-gray-400">Python Code *</label>
-                    <Textarea
-                      value={toolCall.pythonCode}
-                      onChange={(e) => updateToolCall(index, { pythonCode: e.target.value })}
-                      placeholder="# Write Python code here&#10;import requests&#10;import json&#10;&#10;# Your code here..."
-                      className="min-h-[120px] bg-gray-700 border-gray-600 text-white font-mono text-sm"
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <label className="text-xs text-gray-400">Tool Result</label>
-                    <Textarea
-                      value={toolCall.result}
-                      onChange={(e) => updateToolCall(index, { result: e.target.value })}
-                      placeholder="Tool result will appear here after execution..."
-                      className="min-h-[80px] bg-gray-700 border-gray-600 text-white font-mono text-sm"
-                      readOnly
-                    />
-                  </div>
-                  
-                  <Button 
-                    onClick={() => executeToolCall(index)}
-                    disabled={!toolCall.pythonCode.trim() || toolCall.status === 'executing' || toolCall.status === 'completed'}
-                    className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
-                  >
-                    {toolCall.status === 'executing' ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : toolCall.status === 'completed' ? (
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                    ) : (
-                      <Play className="w-4 h-4 mr-2" />
-                    )}
-                    {toolCall.status === 'executing' ? 'Executing...' : toolCall.status === 'completed' ? 'Executed' : 'Get Result'}
-                  </Button>
+                  )}
                 </div>
-              ))}
+              </div>
+            )}
 
-              {/* Execute All Button */}
-              {currentStep === 'assistant' && toolCalls.length > 1 && getPendingToolCallsCount() > 0 && (
-                <div className="mt-4 pt-3 border-t border-gray-600">
-                  <Button 
-                    onClick={executeAllToolCalls}
-                    disabled={executeToolMutation.isPending}
-                    className="w-full bg-purple-600 hover:bg-purple-700 text-white"
-                  >
-                    {executeToolMutation.isPending ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <PlayCircle className="w-4 h-4 mr-2" />
-                    )}
-                    Get All Results ({getPendingToolCallsCount()})
-                  </Button>
-                </div>
-              )}
-            </ScrollArea>
-
-            {/* Bottom Action Bar */}
-            <div className="p-4 border-t border-gray-700">
-              <div className="space-y-3">
-                {/* Action Buttons */}
-                <div className="flex flex-col gap-2">
+            {/* Bottom Action Buttons */}
+            <div className="border-t border-gray-700 bg-gray-800 p-4">
+              <div className="max-w-4xl mx-auto">
+                <div className="flex flex-wrap gap-3 justify-center">
+                  {/* New Turn Button - Only enabled when conversation started and current turn is complete */}
                   <Button 
                     onClick={addNewTurn}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                    disabled={!canStartNewTurn()}
+                    className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
                   >
                     <Plus className="w-4 h-4 mr-2" />
                     New Turn
                   </Button>
 
+                  {/* Add Text Chunk Button */}
                   <Button 
                     onClick={showTextChunkEditor}
                     disabled={!canAddTextChunk()}
                     variant="outline"
-                    className="w-full bg-gray-700 border-gray-600 text-white hover:bg-gray-600 disabled:opacity-50"
+                    className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 disabled:opacity-50"
                   >
                     <FileText className="w-4 h-4 mr-2" />
                     Add Text Chunk
                   </Button>
                   
+                  {/* Add Tool Call Button - Only for assistant */}
                   {canAddToolCall() && (
                     <Button 
                       onClick={addToolCall}
                       variant="outline"
-                      className="w-full bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
+                      className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
                     >
                       <Settings className="w-4 h-4 mr-2" />
                       Add Tool Call
                     </Button>
                   )}
+
+                  {/* Save buttons */}
+                  <Button variant="outline" size="sm" className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600">
+                    <Save className="w-4 h-4 mr-2" />
+                    Save
+                  </Button>
+                  <Button size="sm" className="bg-purple-600 hover:bg-purple-700 text-white">
+                    <Save className="w-4 h-4 mr-2" />
+                    Trace
+                  </Button>
                 </div>
 
                 {/* Status messages */}
-                <div className="text-xs text-center">
+                <div className="text-xs text-center mt-3 text-gray-400">
+                  {!conversationStarted && (
+                    <p className="text-yellow-400">⚠️ User must start the conversation first</p>
+                  )}
                   {currentStep === 'user' && hasAddedTextChunk && (
-                    <p className="text-green-400">✓ Text chunk added. Switch to new turn to continue.</p>
+                    <p className="text-green-400">✓ Text chunk added. Click "New Turn" to switch to assistant.</p>
                   )}
                   {currentStep === 'user' && !canAddTextChunk() && !hasAddedTextChunk && (
                     <p className="text-yellow-400">User can add only one text chunk per turn</p>
                   )}
-                </div>
-
-                {/* Save buttons */}
-                <div className="flex gap-2 pt-2 border-t border-gray-600">
-                  <Button variant="outline" size="sm" className="flex-1 bg-gray-700 border-gray-600 text-white hover:bg-gray-600">
-                    <Save className="w-4 h-4 mr-1" />
-                    Save
-                  </Button>
-                  <Button size="sm" className="flex-1 bg-purple-600 hover:bg-purple-700 text-white">
-                    <Save className="w-4 h-4 mr-1" />
-                    Trace
-                  </Button>
                 </div>
               </div>
             </div>
