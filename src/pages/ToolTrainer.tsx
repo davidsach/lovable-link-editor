@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -481,38 +480,6 @@ const ToolTrainer = () => {
               </Badge>
             </div>
 
-            {/* Show buttons based on current step and state */}
-            {!showTextChunk && !showToolCall && (
-              <div className="mb-4 space-y-3">
-                <p className="text-gray-400 text-sm">Choose what to add to this {currentStep} turn:</p>
-                <div className="flex gap-2">
-                  <Button 
-                    onClick={() => setShowTextChunk(true)}
-                    variant="outline"
-                    className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
-                  >
-                    <FileText className="w-4 h-4 mr-2" />
-                    Add Text Chunk
-                  </Button>
-                  
-                  {currentStep === 'assistant' && (
-                    <Button 
-                      onClick={addToolCall}
-                      disabled={!canAddToolCall()}
-                      variant="outline"
-                      className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 disabled:opacity-50"
-                    >
-                      <Settings className="w-4 h-4 mr-2" />
-                      Add Tool Call
-                    </Button>
-                  )}
-                </div>
-                {currentStep === 'assistant' && !canAddToolCall() && (
-                  <p className="text-red-400 text-xs">Complete previous tool call before adding another</p>
-                )}
-              </div>
-            )}
-
             {/* Text Chunk Input */}
             {showTextChunk && (
               <div className="space-y-3">
@@ -649,6 +616,38 @@ const ToolTrainer = () => {
                 <Plus className="w-4 h-4 mr-2" />
                 New Turn
               </Button>
+
+              {/* Show appropriate buttons based on current step */}
+              {!showTextChunk && !showToolCall && (
+                <>
+                  {/* Text chunk button - available for both user and assistant */}
+                  <Button 
+                    onClick={() => setShowTextChunk(true)}
+                    variant="outline"
+                    className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    Add Text Chunk
+                  </Button>
+                  
+                  {/* Tool call button - only available for assistant */}
+                  {currentStep === 'assistant' && (
+                    <Button 
+                      onClick={addToolCall}
+                      disabled={!canAddToolCall()}
+                      variant="outline"
+                      className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 disabled:opacity-50"
+                    >
+                      <Settings className="w-4 h-4 mr-2" />
+                      Add Tool Call
+                    </Button>
+                  )}
+                </>
+              )}
+
+              {currentStep === 'assistant' && !canAddToolCall() && toolCalls.length > 0 && (
+                <p className="text-red-400 text-xs">Complete previous tool call before adding another</p>
+              )}
             </div>
 
             <div className="flex items-center gap-3">
