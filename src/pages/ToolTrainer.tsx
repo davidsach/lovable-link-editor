@@ -1,900 +1,561 @@
-import React, { useState, useRef } from 'react';
-import { ScrollArea } from '@/components/ui/scroll-area';
+
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ConnectionStatus } from '@/components/ui/connection-status';
+import { LoadingOverlay } from '@/components/ui/loading-overlay';
 import { ErrorDisplay } from '@/components/ui/error-display';
+import { Separator } from '@/components/ui/separator';
 import { 
-  ChevronLeft, 
-  ChevronRight, 
-  Wrench, 
-  Code, 
   Plus, 
+  Trash2, 
   Play, 
-  ArrowLeft, 
   Save, 
-  Type, 
+  Settings, 
+  Code, 
   MessageSquare, 
   User, 
-  Bot, 
-  Loader2, 
-  X, 
-  FileText, 
-  Calendar
+  Bot,
+  Copy,
+  Check,
+  RefreshCw
 } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useTools, useCreateExample, useUpdateExample, useExecuteToolResult } from '@/hooks/useApi';
+import { useTools, useExecuteTool, useExecuteToolResult, useExecuteAllTools } from '@/hooks/useApi';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
-import { Tool, CreateExampleRequest, Step } from '@/services/api';
-import { Message, TrainingExample } from '@/types/toolTrainer';
-import { NavigationHeader } from '@/components/ToolTrainer/NavigationHeader';
-import { ExampleHeader } from '@/components/ToolTrainer/ExampleHeader';
-import { ConnectionStatus } from '@/components/ui/connection-status';
-
-// Mock tools data for when API fails
-const mockTools: Tool[] = [
-  {
-    tool_name: "email_api_tool",
-    functions: [
-      {
-        func_name: "send_email",
-        params: [
-          { param_name: "to", param_type: "str", is_required: true, default_value: "" },
-          { param_name: "subject", param_type: "str", is_required: true, default_value: "" },
-          { param_name: "body", param_type: "str", is_required: true, default_value: "" }
-        ],
-        return_value: { param_name: "success", param_type: "bool", is_required: true, default_value: "True" }
-      },
-      {
-        func_name: "get_emails",
-        params: [
-          { param_name: "folder", param_type: "str", is_required: false, default_value: "inbox" },
-          { param_name: "limit", param_type: "int", is_required: false, default_value: "10" }
-        ],
-        return_value: { param_name: "emails", param_type: "list", is_required: true, default_value: "[]" }
-      }
-    ],
-    classes: []
-  },
-  {
-    tool_name: "contact_api_tool",
-    functions: [
-      {
-        func_name: "get_contact",
-        params: [
-          { param_name: "name", param_type: "str", is_required: true, default_value: "" }
-        ],
-        return_value: { param_name: "contact", param_type: "dict", is_required: true, default_value: "{}" }
-      },
-      {
-        func_name: "add_contact",
-        params: [
-          { param_name: "name", param_type: "str", is_required: true, default_value: "" },
-          { param_name: "email", param_type: "str", is_required: true, default_value: "" },
-          { param_name: "phone", param_type: "str", is_required: false, default_value: "" }
-        ],
-        return_value: { param_name: "contact_id", param_type: "str", is_required: true, default_value: "" }
-      }
-    ],
-    classes: []
-  },
-  {
-    tool_name: "drive_api_tool",
-    functions: [
-      {
-        func_name: "upload_file",
-        params: [
-          { param_name: "file_path", param_type: "str", is_required: true, default_value: "" },
-          { param_name: "folder_id", param_type: "str", is_required: false, default_value: "" }
-        ],
-        return_value: { param_name: "file_id", param_type: "str", is_required: true, default_value: "" }
-      },
-      {
-        func_name: "download_file",
-        params: [
-          { param_name: "file_id", param_type: "str", is_required: true, default_value: "" }
-        ],
-        return_value: { param_name: "file_content", param_type: "bytes", is_required: true, default_value: "" }
-      },
-      {
-        func_name: "list_files",
-        params: [
-          { param_name: "folder_id", param_type: "str", is_required: false, default_value: "" }
-        ],
-        return_value: { param_name: "files", param_type: "list", is_required: true, default_value: "[]" }
-      }
-    ],
-    classes: []
-  },
-  {
-    tool_name: "calendar_api_tool",
-    functions: [
-      {
-        func_name: "create_event",
-        params: [
-          { param_name: "title", param_type: "str", is_required: true, default_value: "" },
-          { param_name: "start_time", param_type: "str", is_required: true, default_value: "" },
-          { param_name: "end_time", param_type: "str", is_required: true, default_value: "" },
-          { param_name: "description", param_type: "str", is_required: false, default_value: "" }
-        ],
-        return_value: { param_name: "event_id", param_type: "str", is_required: true, default_value: "" }
-      },
-      {
-        func_name: "get_events",
-        params: [
-          { param_name: "start_date", param_type: "str", is_required: false, default_value: "" },
-          { param_name: "end_date", param_type: "str", is_required: false, default_value: "" }
-        ],
-        return_value: { param_name: "events", param_type: "list", is_required: true, default_value: "[]" }
-      },
-      {
-        func_name: "delete_event",
-        params: [
-          { param_name: "event_id", param_type: "str", is_required: true, default_value: "" }
-        ],
-        return_value: { param_name: "success", param_type: "bool", is_required: true, default_value: "True" }
-      }
-    ],
-    classes: []
-  },
-  {
-    tool_name: "weather_tool",
-    functions: [
-      {
-        func_name: "get_current_weather",
-        params: [
-          { param_name: "location", param_type: "str", is_required: true, default_value: "" },
-          { param_name: "units", param_type: "str", is_required: false, default_value: "metric" }
-        ],
-        return_value: { param_name: "weather_data", param_type: "dict", is_required: true, default_value: "{}" }
-      },
-      {
-        func_name: "get_forecast",
-        params: [
-          { param_name: "location", param_type: "str", is_required: true, default_value: "" },
-          { param_name: "days", param_type: "int", is_required: false, default_value: "5" },
-          { param_name: "units", param_type: "str", is_required: false, default_value: "metric" }
-        ],
-        return_value: { param_name: "forecast_data", param_type: "dict", is_required: true, default_value: "{}" }
-      }
-    ],
-    classes: []
-  }
-];
+import { useToast } from '@/hooks/use-toast';
+import { Tool, ToolCall, Message, ConversationState } from '@/types/toolTrainer';
 
 const ToolTrainer = () => {
-  // State
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [currentExample, setCurrentExample] = useState<TrainingExample>({
-    id: 1,
-    name: 'Example 1',
-    description: '',
-    messages: [],
-    metadata: {
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      tags: []
-    }
-  });
-  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [history, setHistory] = useState<TrainingExample[]>([]);
-  const [confirmationDialog, setConfirmationDialog] = useState<{
-    open: boolean;
-    title: string;
-    description: string;
-    action: () => void;
-  }>({
-    open: false,
+  const [conversation, setConversation] = useState<ConversationState>({
+    id: '',
     title: '',
-    description: '',
-    action: () => {}
+    messages: [],
+    toolCalls: [],
+    createdAt: new Date(),
+    updatedAt: new Date()
   });
 
-  // Hooks
-  const { data: tools = [], isLoading: toolsLoading, error: toolsError, refetch: refetchTools } = useTools();
-  const { errors, hasErrors, addError, clearErrors } = useErrorHandler();
-  const createExampleMutation = useCreateExample();
-  const updateExampleMutation = useUpdateExample();
-  const executeToolResultMutation = useExecuteToolResult();
+  const [activeTab, setActiveTab] = useState('conversation');
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({});
 
-  // Use mock tools if API fails
-  const availableTools = tools.length > 0 ? tools : mockTools;
-  const isBackendConnected = tools.length > 0 && !toolsError;
+  const { data: tools, isLoading: toolsLoading, error: toolsError, refetch: refetchTools } = useTools();
+  const executeTool = useExecuteTool();
+  const executeToolResult = useExecuteToolResult();
+  const executeAllTools = useExecuteAllTools();
+  const { errors, addError, removeError, clearErrors } = useErrorHandler();
+  const { toast } = useToast();
 
-  // Helper functions
-  const saveToHistory = () => {
-    setHistory(prev => [...prev, { ...currentExample }]);
+  const isConnected = !toolsError;
+
+  const handleRetryConnection = () => {
+    refetchTools();
   };
 
-  const convertToApiFormat = (example: TrainingExample): CreateExampleRequest => {
-    const steps: Step[] = [];
-    
-    const firstUserMessage = example.messages.find(msg => msg.role === 'user');
-    const userPrompt = firstUserMessage?.content
-      .filter(c => c.type === 'text')
-      .map(c => c.content)
-      .join(' ') || '';
-
-    example.messages.forEach(message => {
-      if (message.role === 'assistant') {
-        message.content.forEach(messageContent => {
-          if (messageContent.type === 'tool_call' && messageContent.tool_name) {
-            steps.push({
-              thought: `Using ${messageContent.tool_name} to process the request`,
-              tool_name: messageContent.tool_name,
-              tool_params: { code: messageContent.content },
-              tool_result: 'Result pending...'
-            });
-          }
-        });
-      }
-    });
-
-    return {
-      id: example.id === 0 ? `example_${Date.now()}` : example.id.toString(),
-      name: example.name,
-      description: example.description,
-      tags: example.metadata.tags,
-      user_prompt: userPrompt,
-      steps,
-      created: example.metadata.created_at,
-      updated: new Date().toISOString()
-    };
-  };
-
-  const validateMessages = () => {
-    const messages = currentExample.messages;
-    const errors = [];
-
-    if (messages.length === 0) {
-      errors.push('At least one message is required');
-      return errors;
-    }
-
-    if (messages[0].role !== 'user') {
-      errors.push('First message must be from user');
-    }
-
-    messages.forEach((msg, msgIndex) => {
-      if (msg.content.length === 0) {
-        errors.push(`Message ${msgIndex + 1} has no content chunks`);
-        return;
-      }
-
-      msg.content.forEach((messageContent, contentIndex) => {
-        if (!messageContent.content.trim()) {
-          errors.push(`Message ${msgIndex + 1}, chunk ${contentIndex + 1} is empty`);
-        }
-      });
-    });
-
-    return errors;
-  };
-
-  // Action handlers
-  const addNewTurn = () => {
-    saveToHistory();
-    const messages = currentExample.messages;
-    const lastRole = messages.length > 0 ? messages[messages.length - 1].role : 'assistant';
-    const newRole = lastRole === 'user' ? 'assistant' : 'user';
-    
+  const addMessage = () => {
     const newMessage: Message = {
       id: `msg_${Date.now()}`,
-      role: newRole,
-      content: []
+      role: 'user',
+      content: '',
+      timestamp: new Date()
     };
-    
-    setCurrentExample(prev => ({
+    setConversation(prev => ({
       ...prev,
-      messages: [...prev.messages, newMessage],
-      metadata: {
-        ...prev.metadata,
-        updated_at: new Date().toISOString()
-      }
-    }));
-    
-    setSelectedMessageId(newMessage.id);
-  };
-
-  const addTextChunk = () => {
-    if (currentExample.messages.length === 0) return;
-    
-    saveToHistory();
-    const lastMessage = currentExample.messages[currentExample.messages.length - 1];
-    
-    if (lastMessage.role === 'user') {
-      const hasTextChunk = lastMessage.content.some(c => c.type === 'text');
-      if (hasTextChunk) return;
-    }
-    
-    const updatedMessage = {
-      ...lastMessage,
-      content: [...lastMessage.content, { type: 'text' as const, content: '' }]
-    };
-    
-    setCurrentExample(prev => ({
-      ...prev,
-      messages: prev.messages.map(msg => 
-        msg.id === lastMessage.id ? updatedMessage : msg
-      ),
-      metadata: {
-        ...prev.metadata,
-        updated_at: new Date().toISOString()
-      }
+      messages: [...prev.messages, newMessage]
     }));
   };
 
   const addToolCall = () => {
-    if (currentExample.messages.length === 0) return;
-    
-    saveToHistory();
-    const lastMessage = currentExample.messages[currentExample.messages.length - 1];
-    
-    if (lastMessage.role !== 'assistant') return;
-    
-    const updatedMessage = {
-      ...lastMessage,
-      content: [...lastMessage.content, { 
-        type: 'tool_call' as const, 
-        content: '',
-        tool_name: 'python_executor',
-        tool_id: `tool_${Date.now()}`
-      }]
+    if (!tools || tools.length === 0) {
+      toast({
+        title: 'No Tools Available',
+        description: 'Please ensure your backend is running and tools are available.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const newToolCall: ToolCall = {
+      id: `tool_${Date.now()}`,
+      toolName: tools[0].name,
+      parameters: {},
+      result: null,
+      status: 'pending',
+      timestamp: new Date()
     };
-    
-    setCurrentExample(prev => ({
+    setConversation(prev => ({
       ...prev,
-      messages: prev.messages.map(msg => 
-        msg.id === lastMessage.id ? updatedMessage : msg
-      ),
-      metadata: {
-        ...prev.metadata,
-        updated_at: new Date().toISOString()
-      }
+      toolCalls: [...prev.toolCalls, newToolCall]
     }));
   };
 
-  const handleBack = () => {
-    if (history.length > 0) {
-      const previousState = history[history.length - 1];
-      setCurrentExample(previousState);
-      setHistory(prev => prev.slice(0, -1)); // Remove the last state from history
-    }
+  const updateMessage = (messageId: string, updates: Partial<Message>) => {
+    setConversation(prev => ({
+      ...prev,
+      messages: prev.messages.map(msg => 
+        msg.id === messageId ? { ...msg, ...updates } : msg
+      )
+    }));
   };
 
-  const getToolResult = async (toolId: string) => {
-    setIsLoading(true);
-    
-    const messageWithTool = currentExample.messages.find(msg => 
-      msg.content.some(messageContent => messageContent.tool_id === toolId)
-    );
-    
-    if (!messageWithTool) {
-      setIsLoading(false);
+  const updateToolCall = (toolCallId: string, updates: Partial<ToolCall>) => {
+    setConversation(prev => ({
+      ...prev,
+      toolCalls: prev.toolCalls.map(call => 
+        call.id === toolCallId ? { ...call, ...updates } : call
+      )
+    }));
+  };
+
+  const deleteMessage = (messageId: string) => {
+    setConversation(prev => ({
+      ...prev,
+      messages: prev.messages.filter(msg => msg.id !== messageId)
+    }));
+  };
+
+  const deleteToolCall = (toolCallId: string) => {
+    setConversation(prev => ({
+      ...prev,
+      toolCalls: prev.toolCalls.filter(call => call.id !== toolCallId)
+    }));
+  };
+
+  const executeToolCall = async (toolCall: ToolCall) => {
+    if (!isConnected) {
+      toast({
+        title: 'Backend Disconnected',
+        description: 'Cannot execute tools without backend connection.',
+        variant: 'destructive',
+      });
       return;
     }
 
-    const toolCall = messageWithTool.content.find(messageContent => messageContent.tool_id === toolId);
-    if (!toolCall || !toolCall.content.trim()) {
-      setIsLoading(false);
-      return;
-    }
+    setIsExecuting(true);
+    updateToolCall(toolCall.id, { status: 'executing' });
 
     try {
-      const result = await executeToolResultMutation.mutateAsync({
-        code: toolCall.content
+      const result = await executeTool.mutateAsync({
+        tool_name: toolCall.toolName,
+        parameters: toolCall.parameters
       });
 
-      const formattedResult = typeof result.code_output === 'object' 
-        ? JSON.stringify(result.code_output, null, 2)
-        : String(result.code_output);
+      updateToolCall(toolCall.id, {
+        result: result,
+        status: 'completed'
+      });
 
-      setCurrentExample(prev => ({
-        ...prev,
-        messages: prev.messages.map(msg => ({
-          ...msg,
-          content: msg.content.map(content => 
-            content.tool_id === toolId
-              ? content
-              : content
-          ).concat(
-            msg.content.some(content => content.tool_id === toolId) 
-              ? [{ type: 'tool_result' as const, content: formattedResult }]
-              : []
-          )
-        }))
-      }));
-
+      toast({
+        title: 'Tool Executed',
+        description: `Successfully executed ${toolCall.toolName}`,
+      });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Code execution failed';
-      
-      setCurrentExample(prev => ({
-        ...prev,
-        messages: prev.messages.map(msg => ({
-          ...msg,
-          content: msg.content.map(content => 
-            content.tool_id === toolId
-              ? content
-              : content
-          ).concat(
-            msg.content.some(content => content.tool_id === toolId) 
-              ? [{ type: 'tool_result' as const, content: `Error: ${errorMessage}` }]
-              : []
-          )
-        }))
-      }));
-    }
-    
-    setIsLoading(false);
-  };
-
-  const submitExample = async () => {
-    const validationErrors = validateMessages();
-    
-    if (validationErrors.length > 0) {
-      validationErrors.forEach(error => {
-        addError({
-          message: error,
-          type: 'error',
-          field: 'submission'
-        });
+      updateToolCall(toolCall.id, {
+        result: { error: error instanceof Error ? error.message : 'Unknown error' },
+        status: 'failed'
       });
-      return;
-    }
-
-    try {
-      const apiExample = convertToApiFormat(currentExample);
-      
-      if (currentExample.id === 0) {
-        await createExampleMutation.mutateAsync(apiExample);
-      } else {
-        await updateExampleMutation.mutateAsync({
-          exampleId: currentExample.id.toString(),
-          example: apiExample
-        });
-      }
       
       addError({
-        message: 'Training example saved successfully',
-        type: 'info',
-        field: 'submission'
+        message: `Failed to execute ${toolCall.toolName}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        type: 'error',
+        field: toolCall.id
       });
-    } catch (error) {
-      console.error('Error submitting example:', error);
+    } finally {
+      setIsExecuting(false);
     }
   };
 
-  // Handle file loading
-  const handleLoadExample = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const executeAllToolCalls = async () => {
+    if (!isConnected) {
+      toast({
+        title: 'Backend Disconnected',
+        description: 'Cannot execute tools without backend connection.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = JSON.parse(e.target?.result as string);
-        setCurrentExample(data);
-      } catch (error) {
-        console.error('Error loading example:', error);
-      }
-    };
-    reader.readAsText(file);
-  };
+    const pendingToolCalls = conversation.toolCalls.filter(call => call.status === 'pending');
+    if (pendingToolCalls.length === 0) {
+      toast({
+        title: 'No Pending Tools',
+        description: 'All tools have already been executed or there are no tools to execute.',
+      });
+      return;
+    }
 
-  const handleAutoGenerate = () => {
-    // Auto-generate a sample conversation
-    const sampleExample: TrainingExample = {
-      id: currentExample.id,
-      name: 'Auto-generated Example',
-      description: 'Sample conversation with tool usage',
-      messages: [
-        {
-          id: 'msg_1',
-          role: 'user',
-          content: [{ type: 'text', content: 'Send an email to john@example.com with subject "Meeting" and body "Let\'s meet tomorrow"' }]
-        },
-        {
-          id: 'msg_2',
-          role: 'assistant',
-          content: [
-            { type: 'text', content: 'I\'ll help you send that email. Let me use the email tool.' },
-            { type: 'tool_call', content: 'send_email(to="john@example.com", subject="Meeting", body="Let\'s meet tomorrow")', tool_name: 'email_api_tool', tool_id: 'tool_1' },
-            { type: 'tool_result', content: '{"success": true, "message_id": "msg_12345"}' }
-          ]
-        }
-      ],
-      metadata: {
-        ...currentExample.metadata,
-        updated_at: new Date().toISOString()
-      }
-    };
+    setIsExecuting(true);
     
-    setCurrentExample(sampleExample);
+    try {
+      const toolCallsData = pendingToolCalls.map(call => ({
+        tool_name: call.toolName,
+        parameters: call.parameters
+      }));
+
+      const results = await executeAllTools.mutateAsync({
+        tool_calls: toolCallsData
+      });
+
+      // Update tool calls with results
+      results.forEach((result, index) => {
+        const toolCall = pendingToolCalls[index];
+        updateToolCall(toolCall.id, {
+          result: result,
+          status: result.error ? 'failed' : 'completed'
+        });
+      });
+
+      toast({
+        title: 'Tools Executed',
+        description: `Successfully executed ${results.length} tools`,
+      });
+    } catch (error) {
+      pendingToolCalls.forEach(call => {
+        updateToolCall(call.id, {
+          result: { error: error instanceof Error ? error.message : 'Unknown error' },
+          status: 'failed'
+        });
+      });
+      
+      addError({
+        message: `Failed to execute tools: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        type: 'error'
+      });
+    } finally {
+      setIsExecuting(false);
+    }
   };
 
-  // Validation
-  const canSubmit = validateMessages().length === 0 && currentExample.messages.length > 0;
-  const lastMessage = currentExample.messages[currentExample.messages.length - 1];
-  const isAssistantTurn = lastMessage?.role === 'assistant';
-  const canAddTextChunk = currentExample.messages.length > 0;
-  const canAddToolCall = isAssistantTurn;
+  const copyToClipboard = async (text: string, id: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedStates(prev => ({ ...prev, [id]: true }));
+      setTimeout(() => {
+        setCopiedStates(prev => ({ ...prev, [id]: false }));
+      }, 2000);
+      
+      toast({
+        title: 'Copied!',
+        description: 'Content copied to clipboard',
+      });
+    } catch (error) {
+      toast({
+        title: 'Copy Failed',
+        description: 'Failed to copy to clipboard',
+        variant: 'destructive',
+      });
+    }
+  };
 
-  return (
-    <TooltipProvider>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex">
-        {/* Sidebar */}
-        <div className={`fixed left-0 top-0 h-full bg-white border-r border-gray-200 transition-all duration-300 z-10 ${
-          sidebarCollapsed ? 'w-16' : 'w-80'
-        }`}>
-          <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-            {!sidebarCollapsed && (
-              <h2 className="text-lg font-semibold text-gray-800 flex items-center">
-                <Wrench className="w-5 h-5 mr-2 text-blue-600" />
-                Available Tools
-              </h2>
+  const renderMessage = (message: Message) => (
+    <Card key={message.id} className="mb-4">
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {message.role === 'user' ? (
+              <User className="w-4 h-4" />
+            ) : (
+              <Bot className="w-4 h-4" />
             )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="p-2"
-            >
-              {sidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-            </Button>
+            <Badge variant={message.role === 'user' ? 'default' : 'secondary'}>
+              {message.role}
+            </Badge>
           </div>
-          
-          {!sidebarCollapsed && (
-            <div className="p-4 space-y-4 overflow-y-auto h-full pb-20">
-              {/* Connection Status */}
-              <ConnectionStatus
-                isConnected={isBackendConnected}
-                isLoading={toolsLoading}
-                onRetry={() => refetchTools()}
-              />
-              
-              {availableTools.length > 0 ? (
-                availableTools.map((tool, index) => (
-                  <Card key={index} className="border border-gray-200">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium text-blue-600 flex items-center">
-                        <Code className="w-4 h-4 mr-2" />
-                        {tool.tool_name}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0 space-y-3">
-                      {tool.functions && tool.functions.length > 0 && (
-                        <div>
-                          <div className="flex items-center text-xs font-medium text-gray-700 mb-2">
-                            <Code className="w-3 h-3 mr-1" />
-                            Functions
-                          </div>
-                          <div className="space-y-2">
-                            {tool.functions.map((func, funcIndex) => (
-                              <div key={funcIndex} className="bg-gray-50 p-2 rounded text-xs">
-                                <div className="font-medium text-gray-800">{func.func_name}</div>
-                                {func.params && func.params.length > 0 && (
-                                  <div className="mt-1 space-y-1">
-                                    {func.params.map((param, paramIndex) => (
-                                      <div key={paramIndex} className="text-gray-600">
-                                        <span className="font-mono">{param.param_name}</span>
-                                        <span className="text-gray-500">: {param.param_type}</span>
-                                        {param.is_required && (
-                                          <Badge variant="outline" className="ml-1 text-xs">required</Badge>
-                                        )}
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))
-              ) : (
-                <div className="text-sm text-gray-500 text-center">
-                  {toolsLoading ? 'Loading tools...' : 'No tools available'}
-                </div>
-              )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => deleteMessage(message.id)}
+            className="h-6 w-6 p-0 text-gray-400 hover:text-red-500"
+          >
+            <Trash2 className="w-3 h-3" />
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <Textarea
+          value={message.content}
+          onChange={(e) => updateMessage(message.id, { content: e.target.value })}
+          placeholder="Enter message content..."
+          className="min-h-[100px]"
+        />
+      </CardContent>
+    </Card>
+  );
+
+  const renderToolCall = (toolCall: ToolCall) => {
+    const tool = tools?.find(t => t.name === toolCall.toolName);
+    
+    return (
+      <Card key={toolCall.id} className="mb-4">
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Code className="w-4 h-4" />
+              <Badge variant="outline">{toolCall.toolName}</Badge>
+              <Badge 
+                variant={
+                  toolCall.status === 'completed' ? 'default' :
+                  toolCall.status === 'failed' ? 'destructive' :
+                  toolCall.status === 'executing' ? 'secondary' : 'outline'
+                }
+              >
+                {toolCall.status}
+              </Badge>
+            </div>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => executeToolCall(toolCall)}
+                disabled={isExecuting || !isConnected}
+                className="h-6 w-6 p-0"
+              >
+                <Play className="w-3 h-3" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => deleteToolCall(toolCall.id)}
+                className="h-6 w-6 p-0 text-gray-400 hover:text-red-500"
+              >
+                <Trash2 className="w-3 h-3" />
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <label className="text-sm font-medium mb-2 block">Tool</label>
+            <Select
+              value={toolCall.toolName}
+              onValueChange={(value) => updateToolCall(toolCall.id, { toolName: value, parameters: {} })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {tools?.map(tool => (
+                  <SelectItem key={tool.name} value={tool.name}>
+                    {tool.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium mb-2 block">Parameters (JSON)</label>
+            <Textarea
+              value={JSON.stringify(toolCall.parameters, null, 2)}
+              onChange={(e) => {
+                try {
+                  const params = JSON.parse(e.target.value);
+                  updateToolCall(toolCall.id, { parameters: params });
+                } catch (error) {
+                  // Invalid JSON, don't update
+                }
+              }}
+              placeholder='{"key": "value"}'
+              className="font-mono text-sm"
+            />
+          </div>
+
+          {toolCall.result && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium">Result</label>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => copyToClipboard(JSON.stringify(toolCall.result, null, 2), toolCall.id)}
+                  className="h-6 w-6 p-0"
+                >
+                  {copiedStates[toolCall.id] ? (
+                    <Check className="w-3 h-3 text-green-500" />
+                  ) : (
+                    <Copy className="w-3 h-3" />
+                  )}
+                </Button>
+              </div>
+              <pre className="bg-gray-50 p-3 rounded text-sm overflow-x-auto">
+                {JSON.stringify(toolCall.result, null, 2)}
+              </pre>
             </div>
           )}
+        </CardContent>
+      </Card>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-4">
+      <div className="max-w-6xl mx-auto">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Tool Trainer</h1>
+          <p className="text-gray-600">Create and test tool-calling conversations</p>
         </div>
-        
-        {/* Main Content */}
-        <main className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-80'} flex flex-col`}>
-          <div className="flex-1 overflow-hidden">
-            <ScrollArea className="h-full">
-              <div className="p-6 max-w-6xl mx-auto pb-32">
-                {/* Navigation Header */}
-                <NavigationHeader
-                  currentExample={currentExample}
-                  onNavigatePrevious={() => {
-                    if (currentExample.id > 1) {
-                      setCurrentExample(prev => ({
-                        ...prev,
-                        id: prev.id - 1,
-                        name: `Example ${prev.id - 1}`,
-                        messages: []
-                      }));
-                    }
-                  }}
-                  onNavigateNext={() => {
-                    setCurrentExample(prev => ({
-                      ...prev,
-                      id: prev.id + 1,
-                      name: `Example ${prev.id + 1}`,
-                      messages: []
-                    }));
-                  }}
-                  onLoadConversation={(conversation) => {
-                    setCurrentExample({
-                      ...currentExample,
-                      name: conversation.name,
-                      description: conversation.description,
-                      messages: conversation.messages
-                    });
-                  }}
-                />
 
-                {/* Example Header */}
-                <ExampleHeader
-                  example={currentExample}
-                  onExampleChange={setCurrentExample}
-                  onLoad={handleLoadExample}
-                  onAutoGenerate={handleAutoGenerate}
-                  isLoading={isLoading}
-                />
-                
-                <ErrorDisplay 
-                  errors={errors}
-                  onDismiss={clearErrors}
-                  className="mb-6"
-                />
-                
-                {/* Messages */}
-                <div className="space-y-4">
-                  {currentExample.messages.map((message, index) => (
-                    <Card 
-                      key={message.id}
-                      className={`transition-all cursor-pointer ${
-                        selectedMessageId === message.id 
-                          ? 'ring-2 ring-blue-500 shadow-lg' 
-                          : 'hover:shadow-md'
-                      }`}
-                      onClick={() => setSelectedMessageId(message.id)}
-                    >
-                      <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-2">
-                            {message.role === 'user' ? (
-                              <User className="w-5 h-5 text-blue-600" />
-                            ) : (
-                              <Bot className="w-5 h-5 text-green-600" />
-                            )}
-                            <Badge 
-                              variant={message.role === 'user' ? 'default' : 'secondary'}
-                              className="capitalize"
-                            >
-                              {message.role}
-                            </Badge>
-                          </div>
-                          <Badge variant="outline" className="text-xs">
-                            {message.content.length} chunk{message.content.length !== 1 ? 's' : ''}
-                          </Badge>
-                        </div>
-                      </CardHeader>
-                      
-                      <CardContent className="space-y-4">
-                        {message.content.map((content, contentIndex) => (
-                          <div key={contentIndex} className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <Badge 
-                                variant="outline" 
-                                className={`text-xs ${
-                                  content.type === 'text' ? 'bg-gray-50' :
-                                  content.type === 'tool_call' ? 'bg-blue-50' :
-                                  'bg-green-50'
-                                }`}
-                              >
-                                {content.type.replace('_', ' ')}
-                              </Badge>
-                              {message.content.length > 1 && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    const updatedMessage = {
-                                      ...message,
-                                      content: message.content.filter((_, i) => i !== contentIndex)
-                                    };
-                                    setCurrentExample(prev => ({
-                                      ...prev,
-                                      messages: prev.messages.map(msg => 
-                                        msg.id === message.id ? updatedMessage : msg
-                                      )
-                                    }));
-                                  }}
-                                  className="h-6 w-6 p-0 text-gray-400 hover:text-red-500"
-                                >
-                                  <X className="w-3 h-3" />
-                                </Button>
-                              )}
-                            </div>
-                            
-                            {content.type === 'text' && (
-                              <Textarea
-                                value={content.content}
-                                onChange={(e) => {
-                                  e.stopPropagation();
-                                  const updatedMessage = {
-                                    ...message,
-                                    content: message.content.map((c, i) => 
-                                      i === contentIndex ? { ...c, content: e.target.value } : c
-                                    )
-                                  };
-                                  setCurrentExample(prev => ({
-                                    ...prev,
-                                    messages: prev.messages.map(msg => 
-                                      msg.id === message.id ? updatedMessage : msg
-                                    )
-                                  }));
-                                }}
-                                placeholder="Enter message content..."
-                                className="min-h-[80px]"
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                            )}
-                            
-                            {content.type === 'tool_call' && (
-                              <div className="space-y-4">
-                                <Textarea
-                                  value={content.content}
-                                  onChange={(e) => {
-                                    e.stopPropagation();
-                                    const updatedMessage = {
-                                      ...message,
-                                      content: message.content.map((c, i) => 
-                                        i === contentIndex ? { ...c, content: e.target.value } : c
-                                      )
-                                    };
-                                    setCurrentExample(prev => ({
-                                      ...prev,
-                                      messages: prev.messages.map(msg => 
-                                        msg.id === message.id ? updatedMessage : msg
-                                      )
-                                    }));
-                                  }}
-                                  placeholder="# Write your Python code here..."
-                                  className="font-mono text-sm min-h-[150px] bg-gray-50"
-                                  onClick={(e) => e.stopPropagation()}
-                                />
-                                
-                                <Button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    getToolResult(content.tool_id || '');
-                                  }}
-                                  disabled={isLoading || !content.content.trim()}
-                                  className="bg-green-600 hover:bg-green-700"
-                                >
-                                  {isLoading ? (
-                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                  ) : (
-                                    <Play className="w-4 h-4 mr-2" />
-                                  )}
-                                  Execute Code
-                                </Button>
-                              </div>
-                            )}
-                            
-                            {content.type === 'tool_result' && (
-                              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                                <div className="text-sm font-medium text-green-800 mb-2">Execution Result:</div>
-                                <pre className="text-sm text-green-700 whitespace-pre-wrap font-mono max-h-40 overflow-y-auto">
-                                  {content.content}
-                                </pre>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </CardContent>
-                    </Card>
-                  ))}
-                  
-                  {currentExample.messages.length === 0 && (
-                    <Card className="border-dashed border-2 border-gray-300">
-                      <CardContent className="flex flex-col items-center justify-center py-12">
-                        <MessageSquare className="w-12 h-12 text-gray-400 mb-4" />
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">No messages yet</h3>
-                        <p className="text-gray-500 text-center mb-6">
-                          Start building your training example by adding a conversation turn.
-                        </p>
-                        <Button onClick={addNewTurn} className="bg-blue-600 hover:bg-blue-700">
-                          <Plus className="w-4 h-4 mr-2" />
-                          Add First Message
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
-              </div>
-            </ScrollArea>
-          </div>
-
-          {/* Action Bar */}
-          <div className="fixed bottom-0 right-0 left-0 bg-white border-t border-gray-200 shadow-lg z-10" 
-               style={{ marginLeft: sidebarCollapsed ? '64px' : '320px' }}>
-            <div className="p-4 max-w-6xl mx-auto">
-              <div className="flex flex-wrap gap-3 items-center">
-                <Button 
-                  onClick={addNewTurn}
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  New Turn
-                </Button>
-                
-                <Button 
-                  onClick={addTextChunk}
-                  disabled={!canAddTextChunk}
-                  variant="outline"
-                  className={`${canAddTextChunk ? 'border-blue-500 text-blue-600 hover:bg-blue-50' : ''}`}
-                >
-                  <Type className="w-4 h-4 mr-2" />
-                  Add Text Chunk
-                </Button>
-                
-                <Button 
-                  onClick={addToolCall}
-                  disabled={!canAddToolCall}
-                  variant="outline"
-                  className={`${canAddToolCall ? 'border-green-500 text-green-600 hover:bg-green-50' : ''}`}
-                >
-                  <Wrench className="w-4 h-4 mr-2" />
-                  Add Python Code
-                </Button>
-                
-                <Button 
-                  onClick={handleBack}
-                  variant="outline"
-                  disabled={history.length === 0}
-                >
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back
-                </Button>
-                
-                <Button 
-                  onClick={submitExample}
-                  disabled={!canSubmit || createExampleMutation.isPending || updateExampleMutation.isPending}
-                  className="bg-purple-600 hover:bg-purple-700 ml-auto"
-                >
-                  <Save className="w-4 h-4 mr-2" />
-                  {createExampleMutation.isPending || updateExampleMutation.isPending ? 'Saving...' : 'Save Trace'}
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          <ConfirmationDialog
-            open={confirmationDialog.open}
-            onOpenChange={(open) => setConfirmationDialog(prev => ({ ...prev, open }))}
-            title={confirmationDialog.title}
-            description={confirmationDialog.description}
-            onConfirm={() => {
-              confirmationDialog.action();
-              setConfirmationDialog(prev => ({ ...prev, open: false }));
-            }}
+        <div className="mb-4">
+          <ConnectionStatus 
+            isConnected={isConnected}
+            isLoading={toolsLoading}
+            onRetry={handleRetryConnection}
           />
-        </main>
+        </div>
+
+        <ErrorDisplay 
+          errors={errors}
+          onDismiss={removeError}
+          className="mb-4"
+        />
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Conversation Builder</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={executeAllToolCalls}
+                      disabled={isExecuting || !isConnected}
+                    >
+                      {isExecuting ? (
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Play className="w-4 h-4 mr-2" />
+                      )}
+                      Execute All
+                    </Button>
+                    <Button variant="outline" size="sm">
+                      <Save className="w-4 h-4 mr-2" />
+                      Save
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <Tabs value={activeTab} onValueChange={setActiveTab}>
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="conversation">
+                      <MessageSquare className="w-4 h-4 mr-2" />
+                      Messages
+                    </TabsTrigger>
+                    <TabsTrigger value="tools">
+                      <Code className="w-4 h-4 mr-2" />
+                      Tool Calls
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="conversation" className="mt-4">
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <h3 className="text-lg font-semibold">Messages</h3>
+                        <Button onClick={addMessage} size="sm">
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add Message
+                        </Button>
+                      </div>
+                      
+                      <ScrollArea className="h-[600px]">
+                        <div className="pr-4">
+                          {conversation.messages.length === 0 ? (
+                            <div className="text-center py-8 text-gray-500">
+                              No messages yet. Click "Add Message" to start building your conversation.
+                            </div>
+                          ) : (
+                            conversation.messages.map(renderMessage)
+                          )}
+                        </div>
+                      </ScrollArea>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="tools" className="mt-4">
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <h3 className="text-lg font-semibold">Tool Calls</h3>
+                        <Button 
+                          onClick={addToolCall} 
+                          size="sm"
+                          disabled={!isConnected || !tools || tools.length === 0}
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add Tool Call
+                        </Button>
+                      </div>
+                      
+                      <ScrollArea className="h-[600px]">
+                        <div className="pr-4">
+                          {conversation.toolCalls.length === 0 ? (
+                            <div className="text-center py-8 text-gray-500">
+                              No tool calls yet. Click "Add Tool Call" to start testing tools.
+                            </div>
+                          ) : (
+                            conversation.toolCalls.map(renderToolCall)
+                          )}
+                        </div>
+                      </ScrollArea>
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div>
+            <Card>
+              <CardHeader>
+                <CardTitle>Available Tools</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {toolsLoading ? (
+                  <div className="text-center py-4">
+                    <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2" />
+                    <p className="text-sm text-gray-600">Loading tools...</p>
+                  </div>
+                ) : !isConnected ? (
+                  <div className="text-center py-4">
+                    <Alert>
+                      <AlertDescription>
+                        Backend disconnected. Using mock data for development.
+                      </AlertDescription>
+                    </Alert>
+                  </div>
+                ) : tools && tools.length > 0 ? (
+                  <div className="space-y-2">
+                    {tools.map(tool => (
+                      <div key={tool.name} className="p-3 border rounded-lg">
+                        <div className="font-medium text-sm">{tool.name}</div>
+                        <div className="text-xs text-gray-600 mt-1">{tool.description}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-4 text-gray-500">
+                    No tools available
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        <LoadingOverlay 
+          isLoading={isExecuting}
+          message="Executing tools..."
+        />
       </div>
-    </TooltipProvider>
+    </div>
   );
 };
 
