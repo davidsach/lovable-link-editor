@@ -271,9 +271,15 @@ const ToolTrainer = () => {
   const executeAllToolCalls = async () => {
     const executableToolCalls = toolCalls.filter(tc => tc.pythonCode.trim() && tc.status !== 'completed' && tc.status !== 'executing');
     
+    // Execute tool calls sequentially, one by one
     for (const toolCall of executableToolCalls) {
       const index = toolCalls.findIndex(tc => tc.id === toolCall.id);
+      
+      // Wait for this tool call to complete before moving to the next
       await executeToolCall(index);
+      
+      // Add a small delay between executions to ensure proper state updates
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
   };
 
