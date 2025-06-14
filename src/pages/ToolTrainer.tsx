@@ -128,6 +128,41 @@ const mockTools: Tool[] = [
         ]
       }
     ]
+  },
+  {
+    tool_name: 'email_api_tool',
+    description: 'Email API tool for sending and managing emails',
+    functions: [
+      {
+        func_name: 'send_email',
+        params: [
+          {
+            param_name: 'to',
+            param_type: 'string',
+            is_required: true,
+            default_value: ''
+          },
+          {
+            param_name: 'subject',
+            param_type: 'string',
+            is_required: true,
+            default_value: ''
+          },
+          {
+            param_name: 'body',
+            param_type: 'string',
+            is_required: true,
+            default_value: ''
+          },
+          {
+            param_name: 'cc',
+            param_type: 'string',
+            is_required: false,
+            default_value: ''
+          }
+        ]
+      }
+    ]
   }
 ];
 
