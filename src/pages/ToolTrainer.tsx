@@ -1,77 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import React, { useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { 
-  Plus, 
-  Play, 
-  RotateCcw, 
-  ArrowLeft, 
-  ArrowRight,
-  Upload, 
-  Download,
-  MessageSquare,
-  Sparkles,
-  AlertTriangle,
-  Save,
-  Type,
-  Wrench,
-  ChevronLeft,
-  ChevronRight
-} from 'lucide-react';
 import { Sidebar } from '@/components/ToolTrainer/Sidebar';
 import { MessageBuilder } from '@/components/ToolTrainer/MessageBuilder';
 import { ExampleHeader } from '@/components/ToolTrainer/ExampleHeader';
-import { useTools, useExamples, useCreateExample, useUpdateExample, useExecuteToolResult, useExecuteAllTools } from '@/hooks/useApi';
-import { CreateExampleRequest, Step, Tool, CodeChunk } from '@/services/api';
+import { NavigationHeader } from '@/components/ToolTrainer/NavigationHeader';
+import { ActionBar } from '@/components/ToolTrainer/ActionBar';
+import { EmptyState } from '@/components/ToolTrainer/EmptyState';
+import { useTools } from '@/hooks/useApi';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
-import { LoadingOverlay } from '@/components/ui/loading-overlay';
 import { ErrorDisplay } from '@/components/ui/error-display';
-import { useErrorHandler } from '@/hooks/useErrorHandler';
-import { validateExampleMetadata } from '@/utils/validation';
-import { SaveConversationDialog } from '@/components/ToolTrainer/SaveConversationDialog';
-import { SavedConversations } from '@/components/ToolTrainer/SavedConversations';
-import { conversationService, SavedConversation } from '@/services/conversationService';
-
-export interface Message {
-  id: string;
-  role: 'user' | 'assistant';
-  content: Array<{
-    type: 'text' | 'tool_call' | 'tool_result';
-    content: string;
-    tool_name?: string;
-    tool_id?: string;
-  }>;
-}
-
-export interface TrainingExample {
-  id: number;
-  name: string;
-  description: string;
-  messages: Message[];
-  metadata: {
-    created_at: string;
-    updated_at: string;
-    tags: string[];
-  };
-}
+import { useToolTrainerLogic } from '@/hooks/useToolTrainerLogic';
+import { Message, TrainingExample } from '@/types/toolTrainer';
+import { CodeChunk } from '@/services/api';
 
 const ToolTrainer = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [currentExample, setCurrentExample] = useState<TrainingExample>({
-    id: 1,
-    name: 'Example 1',
-    description: '',
-    messages: [],
-    metadata: {
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      tags: []
-    }
-  });
-  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [history, setHistory] = useState<Message[][]>([]);
   const [confirmationDialog, setConfirmationDialog] = useState<{
     open: boolean;
     title: string;
@@ -83,147 +26,35 @@ const ToolTrainer = () => {
     description: '',
     action: () => {}
   });
-  const [executionTimeouts, setExecutionTimeouts] = useState<Record<string, NodeJS.Timeout>>({});
 
-  // Enhanced error handling
-  const { errors, hasErrors, addError, clearErrors } = useErrorHandler();
-
-  // API hooks
   const { data: tools = [], isLoading: toolsLoading } = useTools();
-  const { data: examples = [], isLoading: examplesLoading } = useExamples();
-  const createExampleMutation = useCreateExample();
-  const updateExampleMutation = useUpdateExample();
-  const executeToolResultMutation = useExecuteToolResult();
-  const executeAllToolsMutation = useExecuteAllTools();
+  
+  const {
+    currentExample,
+    setCurrentExample,
+    selectedMessageId,
+    setSelectedMessageId,
+    isLoading,
+    setIsLoading,
+    history,
+    executionTimeouts,
+    setExecutionTimeouts,
+    errors,
+    hasErrors,
+    addError,
+    clearErrors,
+    createExampleMutation,
+    updateExampleMutation,
+    executeToolResultMutation,
+    executeAllToolsMutation,
+    saveToHistory,
+    loadSavedConversation,
+    convertToApiFormat,
+    validateMessages
+  } = useToolTrainerLogic();
 
-  // Add new function to load saved conversation
-  const loadSavedConversation = (conversation: SavedConversation) => {
-    setCurrentExample({
-      id: parseInt(conversation.id.replace('conv_', '')) || 1,
-      name: conversation.name,
-      description: conversation.description,
-      messages: conversation.messages,
-      metadata: {
-        created_at: conversation.createdAt,
-        updated_at: conversation.updatedAt,
-        tags: []
-      }
-    });
-  };
-
-  // Save current state to history
-  const saveToHistory = () => {
-    setHistory(prev => [...prev, currentExample.messages]);
-  };
-
-  // Convert messages to API format
-  const convertToApiFormat = (example: TrainingExample): CreateExampleRequest => {
-    const steps: Step[] = [];
-    
-    // Extract user prompt from first user message
-    const firstUserMessage = example.messages.find(msg => msg.role === 'user');
-    const userPrompt = firstUserMessage?.content
-      .filter(c => c.type === 'text')
-      .map(c => c.content)
-      .join(' ') || '';
-
-    // Convert tool calls to steps
-    example.messages.forEach(message => {
-      if (message.role === 'assistant') {
-        message.content.forEach(messageContent => {
-          if (messageContent.type === 'tool_call' && messageContent.tool_name) {
-            steps.push({
-              thought: `Using ${messageContent.tool_name} to process the request`,
-              tool_name: messageContent.tool_name,
-              tool_params: { code: messageContent.content },
-              tool_result: 'Result pending...'
-            });
-          }
-        });
-      }
-    });
-
-    return {
-      id: example.id === 0 ? `example_${Date.now()}` : example.id.toString(),
-      name: example.name,
-      description: example.description,
-      tags: example.metadata.tags,
-      user_prompt: userPrompt,
-      steps,
-      created: example.metadata.created_at,
-      updated: new Date().toISOString()
-    };
-  };
-
-  // Use tools from API
   const availableTools = tools.length > 0 ? tools : [];
 
-  // Enhanced validation functions
-  const validateMessages = () => {
-    const messages = currentExample.messages;
-    const errors = [];
-
-    if (messages.length === 0) {
-      errors.push('At least one message is required');
-      return errors;
-    }
-
-    // Check if first message is user
-    if (messages[0].role !== 'user') {
-      errors.push('First message must be from user');
-    }
-
-    // Check if last message is assistant
-    if (messages[messages.length - 1].role !== 'assistant') {
-      errors.push('Last message must be from assistant');
-    }
-
-    // Check for empty content and validate each chunk
-    messages.forEach((msg, msgIndex) => {
-      if (msg.content.length === 0) {
-        errors.push(`Message ${msgIndex + 1} has no content chunks`);
-        return;
-      }
-
-      msg.content.forEach((messageContent, contentIndex) => {
-        if (!messageContent.content.trim()) {
-          errors.push(`Message ${msgIndex + 1}, chunk ${contentIndex + 1} is empty`);
-        }
-
-        // Validate Python code in tool calls
-        if (messageContent.type === 'tool_call') {
-          if (!messageContent.tool_name) {
-            errors.push(`Message ${msgIndex + 1}, chunk ${contentIndex + 1} missing tool name`);
-          }
-          
-          // Check for unmatched tool calls (tool calls without results)
-          const nextContent = msg.content[contentIndex + 1];
-          if (!nextContent || nextContent.type !== 'tool_result') {
-            errors.push(`Message ${msgIndex + 1}, chunk ${contentIndex + 1} tool call needs execution result`);
-          }
-        }
-      });
-
-      // Check user messages have only one text chunk
-      if (msg.role === 'user') {
-        const textChunks = msg.content.filter(c => c.type === 'text');
-        if (textChunks.length > 1) {
-          errors.push(`User message ${msgIndex + 1} has multiple text chunks (only one allowed)`);
-        }
-        if (textChunks.length === 0) {
-          errors.push(`User message ${msgIndex + 1} must have a text chunk`);
-        }
-      }
-    });
-
-    // Validate example metadata
-    const metadataValidation = validateExampleMetadata(currentExample.name, currentExample.description);
-    errors.push(...metadataValidation.errors);
-
-    return errors;
-  };
-
-  // Navigation functions
   const navigateToPreviousExample = () => {
     if (currentExample.id > 1) {
       setCurrentExample(prev => ({
@@ -297,10 +128,9 @@ const ToolTrainer = () => {
     saveToHistory();
     const lastMessage = currentExample.messages[currentExample.messages.length - 1];
     
-    // Check if user can add text chunk (only for user messages and only one allowed)
     if (lastMessage.role === 'user') {
       const hasTextChunk = lastMessage.content.some(c => c.type === 'text');
-      if (hasTextChunk) return; // User already has text chunk
+      if (hasTextChunk) return;
     }
     
     const updatedMessage = {
@@ -322,10 +152,8 @@ const ToolTrainer = () => {
     saveToHistory();
     const lastMessage = currentExample.messages[currentExample.messages.length - 1];
     
-    // Only allow tool calls for assistant messages
     if (lastMessage.role !== 'assistant') return;
     
-    // Check if there's a pending tool call without result
     const hasPendingToolCall = lastMessage.content.some(content => {
       if (content.type === 'tool_call') {
         const toolCallIndex = lastMessage.content.findIndex(c => c === content);
@@ -335,7 +163,7 @@ const ToolTrainer = () => {
       return false;
     });
     
-    if (hasPendingToolCall) return; // Don't allow new tool call until previous one has result
+    if (hasPendingToolCall) return;
     
     const updatedMessage = {
       ...lastMessage,
@@ -356,12 +184,11 @@ const ToolTrainer = () => {
   };
 
   const getToolResult = async (toolId: string) => {
-    const EXECUTION_TIMEOUT = 30000; // 30 seconds
+    const EXECUTION_TIMEOUT = 30000;
     
     setIsLoading(true);
     clearErrors(`execution-${toolId}`);
     
-    // Find the tool call
     const messageWithTool = currentExample.messages.find(msg => 
       msg.content.some(messageContent => messageContent.tool_id === toolId)
     );
@@ -387,7 +214,6 @@ const ToolTrainer = () => {
       return;
     }
 
-    // Set up timeout
     const timeoutId = setTimeout(() => {
       setIsLoading(false);
       addError({
@@ -401,12 +227,10 @@ const ToolTrainer = () => {
     setExecutionTimeouts(prev => ({ ...prev, [toolId]: timeoutId }));
 
     try {
-      // Use the new backend API
       const result = await executeToolResultMutation.mutateAsync({
         code: toolCall.content
       });
 
-      // Clear timeout
       clearTimeout(timeoutId);
       setExecutionTimeouts(prev => {
         const { [toolId]: removed, ...rest } = prev;
@@ -417,7 +241,6 @@ const ToolTrainer = () => {
         ? JSON.stringify(result.code_output, null, 2)
         : String(result.code_output);
 
-      // Add tool result after the tool call
       setCurrentExample(prev => ({
         ...prev,
         messages: prev.messages.map(msg => ({
@@ -441,7 +264,6 @@ const ToolTrainer = () => {
       });
 
     } catch (error) {
-      // Clear timeout
       clearTimeout(timeoutId);
       setExecutionTimeouts(prev => {
         const { [toolId]: removed, ...rest } = prev;
@@ -450,7 +272,6 @@ const ToolTrainer = () => {
 
       const errorMessage = error instanceof Error ? error.message : 'Code execution failed';
       
-      // Add error as tool result
       setCurrentExample(prev => ({
         ...prev,
         messages: prev.messages.map(msg => ({
@@ -481,7 +302,6 @@ const ToolTrainer = () => {
   const getAllResults = async () => {
     setIsLoading(true);
     
-    // Collect all tool calls
     const codeChunks: CodeChunk[] = [];
     let chunkId = 0;
     
@@ -507,12 +327,10 @@ const ToolTrainer = () => {
     }
 
     try {
-      // Execute all tool calls using the new API
       const result = await executeAllToolsMutation.mutateAsync({
         code_chunks: codeChunks
       });
 
-      // Update all tool results
       let resultIndex = 0;
       setCurrentExample(prev => ({
         ...prev,
@@ -528,7 +346,6 @@ const ToolTrainer = () => {
             }
             return messageContent;
           }).concat(
-            // Add tool results after tool calls
             msg.content
               .filter(content => content.type === 'tool_call' && content.tool_id)
               .map((content, index) => {
@@ -571,7 +388,6 @@ const ToolTrainer = () => {
         ...prev,
         messages: previousState
       }));
-      setHistory(prev => prev.slice(0, -1));
     }
   };
 
@@ -643,7 +459,6 @@ const ToolTrainer = () => {
 
   const autoGenerateExample = async () => {
     setIsLoading(true);
-    // Simulate auto-generation
     setTimeout(() => {
       const newExample: TrainingExample = {
         id: Math.floor(Math.random() * 1000) + 1,
@@ -683,15 +498,11 @@ const ToolTrainer = () => {
   const validationErrors = validateMessages();
   const canSubmit = validationErrors.length === 0 && currentExample.messages.length > 0 && !hasErrors;
   
-  // Determine current turn and button availability
   const lastMessage = currentExample.messages[currentExample.messages.length - 1];
-  const isUserTurn = lastMessage?.role === 'user';
   const isAssistantTurn = lastMessage?.role === 'assistant';
   
-  // Text chunk can be added to both user and assistant messages
   const canAddTextChunk = currentExample.messages.length > 0;
   
-  // Check if can add tool call (only assistant turn and no pending tool calls)
   const canAddToolCall = isAssistantTurn && !lastMessage?.content.some(content => {
     if (content.type === 'tool_call') {
       const toolCallIndex = lastMessage.content.findIndex(c => c === content);
@@ -713,42 +524,12 @@ const ToolTrainer = () => {
         <div className="flex-1 overflow-hidden">
           <ScrollArea className="h-full">
             <div className="p-6 max-w-6xl mx-auto pb-32">
-              {/* Navigation Header */}
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <Button
-                    onClick={navigateToPreviousExample}
-                    disabled={currentExample.id <= 1}
-                    variant="outline"
-                    size="sm"
-                    aria-label="Previous example"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                    Previous
-                  </Button>
-                  <span className="font-medium text-gray-600">
-                    Example ID: {currentExample.id}
-                  </span>
-                  <Button
-                    onClick={navigateToNextExample}
-                    variant="outline"
-                    size="sm"
-                    aria-label="Next example"
-                  >
-                    Next
-                    <ChevronRight className="w-4 h-4" />
-                  </Button>
-                </div>
-                
-                {/* Add Save and Load functionality */}
-                <div className="flex items-center gap-3">
-                  <SavedConversations onLoadConversation={loadSavedConversation} />
-                  <SaveConversationDialog 
-                    messages={currentExample.messages}
-                    exampleName={currentExample.name}
-                  />
-                </div>
-              </div>
+              <NavigationHeader
+                currentExample={currentExample}
+                onNavigatePrevious={navigateToPreviousExample}
+                onNavigateNext={navigateToNextExample}
+                onLoadConversation={loadSavedConversation}
+              />
 
               <ExampleHeader 
                 example={currentExample}
@@ -758,7 +539,6 @@ const ToolTrainer = () => {
                 isLoading={isLoading || createExampleMutation.isPending || updateExampleMutation.isPending}
               />
               
-              {/* Enhanced Error Display */}
               <ErrorDisplay 
                 errors={errors}
                 onDismiss={clearErrors}
@@ -801,32 +581,11 @@ const ToolTrainer = () => {
                   ))}
                   
                   {currentExample.messages.length === 0 && (
-                    <Card className="border-dashed border-2 border-gray-300">
-                      <CardContent className="p-12 text-center">
-                        <MessageSquare className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">No messages yet</h3>
-                        <p className="text-gray-500 mb-6">Start building your training example by adding a new turn</p>
-                        <div className="flex gap-3 justify-center">
-                          <Button 
-                            onClick={addNewTurn}
-                            className="bg-blue-600 hover:bg-blue-700"
-                            aria-label="Add new conversation turn"
-                          >
-                            <Plus className="w-4 h-4 mr-2" />
-                            Add New Turn
-                          </Button>
-                          <Button 
-                            onClick={autoGenerateExample}
-                            variant="outline"
-                            disabled={isLoading}
-                            aria-label="Auto generate example"
-                          >
-                            <Sparkles className="w-4 h-4 mr-2" />
-                            Auto Generate
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
+                    <EmptyState
+                      isLoading={isLoading}
+                      onAddNewTurn={addNewTurn}
+                      onAutoGenerate={autoGenerateExample}
+                    />
                   )}
                 </div>
               </div>
@@ -834,78 +593,23 @@ const ToolTrainer = () => {
           </ScrollArea>
         </div>
 
-        {/* Enhanced Action Bar with accessibility */}
-        <div className="fixed bottom-0 right-0 left-0 bg-white border-t border-gray-200 shadow-lg z-10" 
-             style={{ marginLeft: sidebarCollapsed ? '64px' : '320px' }}>
-          <div className="p-4 max-w-6xl mx-auto">
-            <div className="flex flex-wrap gap-3 items-center">
-              <Button 
-                onClick={addNewTurn}
-                className="bg-blue-600 hover:bg-blue-700"
-                aria-label="Add new conversation turn"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                New Turn
-              </Button>
-              
-              <Button 
-                onClick={addTextChunk}
-                disabled={!canAddTextChunk}
-                variant="outline"
-                className={`${canAddTextChunk ? 'border-blue-500 text-blue-600 hover:bg-blue-50' : ''}`}
-              >
-                <Type className="w-4 h-4 mr-2" />
-                Add Text Chunk
-              </Button>
-              
-              <Button 
-                onClick={addToolCall}
-                disabled={!canAddToolCall}
-                variant="outline"
-                className={`${canAddToolCall ? 'border-green-500 text-green-600 hover:bg-green-50' : ''}`}
-              >
-                <Wrench className="w-4 h-4 mr-2" />
-                Add Python Code
-              </Button>
-              
-              <Button 
-                onClick={getAllResults}
-                disabled={isLoading}
-                className="bg-green-600 hover:bg-green-700"
-              >
-                <Play className="w-4 h-4 mr-2" />
-                Execute All Code
-              </Button>
-              
-              <Button 
-                onClick={goBack}
-                variant="outline"
-                disabled={history.length === 0}
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back
-              </Button>
-              
-              {/* Add save button in the action bar too */}
-              <SaveConversationDialog 
-                messages={currentExample.messages}
-                exampleName={currentExample.name}
-              />
-              
-              <Button 
-                onClick={submitExample}
-                disabled={!canSubmit || createExampleMutation.isPending || updateExampleMutation.isPending}
-                className="bg-purple-600 hover:bg-purple-700 ml-auto"
-                aria-label="Save training example"
-              >
-                <Save className="w-4 h-4 mr-2" />
-                {createExampleMutation.isPending || updateExampleMutation.isPending ? 'Saving...' : 'Save Trace'}
-              </Button>
-            </div>
-          </div>
-        </div>
+        <ActionBar
+          sidebarCollapsed={sidebarCollapsed}
+          currentExample={currentExample}
+          isLoading={isLoading}
+          canSubmit={canSubmit}
+          canAddTextChunk={canAddTextChunk}
+          canAddToolCall={canAddToolCall}
+          historyLength={history.length}
+          isSaving={createExampleMutation.isPending || updateExampleMutation.isPending}
+          onAddNewTurn={addNewTurn}
+          onAddTextChunk={addTextChunk}
+          onAddToolCall={addToolCall}
+          onGetAllResults={getAllResults}
+          onGoBack={goBack}
+          onSubmitExample={submitExample}
+        />
 
-        {/* Confirmation Dialog */}
         <ConfirmationDialog
           open={confirmationDialog.open}
           onOpenChange={(open) => setConfirmationDialog(prev => ({ ...prev, open }))}

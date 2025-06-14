@@ -103,13 +103,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ tools, collapsed, onToggle }) 
                           </div>
                         ))}
                       </div>
-                    )}
+                    </div>
                   )}
                 </CardContent>
               </Card>
             ))
           ) : (
-            // Fallback display when no tools are loaded from API
             <div className="space-y-4">
               <div className="text-sm text-gray-500 text-center">Loading tools...</div>
             </div>
