@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Save, Check } from 'lucide-react';
 import { conversationService } from '../../services/conversationService';
-import { Message } from '../../pages/ToolTrainer';
+import { Message } from '../../types/toolTrainer';
 
 interface SaveConversationDialogProps {
   messages: Message[];

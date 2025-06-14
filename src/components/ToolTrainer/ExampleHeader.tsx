@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Upload, Sparkles, Loader2, FileText, Calendar } from 'lucide-react';
-import { TrainingExample } from '../../pages/ToolTrainer';
+import { TrainingExample } from '../../types/toolTrainer';
 
 interface ExampleHeaderProps {
   example: TrainingExample;

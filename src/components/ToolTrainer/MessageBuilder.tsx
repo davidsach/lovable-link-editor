@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { MessageSquare, User, Bot, Play, Loader2, X, AlertTriangle, HelpCircle } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ToolCallEditor } from './ToolCallEditor';
-import { Message } from '../../pages/ToolTrainer';
+import { Message } from '../../types/toolTrainer';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { LoadingOverlay } from '@/components/ui/loading-overlay';
 import { ErrorDisplay } from '@/components/ui/error-display';
@@ -15,9 +15,23 @@ import { useErrorHandler } from '@/hooks/useErrorHandler';
 import { validateMessageContent } from '@/utils/validation';
 
 interface Tool {
-  name: string;
-  description: string;
-  functions: string[];
+  tool_name: string;
+  functions: Array<{
+    func_name: string;
+    params: Array<{
+      param_name: string;
+      param_type: string;
+      is_required: boolean;
+    }>;
+  }>;
+  classes: Array<{
+    class_name: string;
+    params: Array<{
+      param_name: string;
+      param_type: string;
+      is_required: boolean;
+    }>;
+  }>;
 }
 
 interface MessageBuilderProps {

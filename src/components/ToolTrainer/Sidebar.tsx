@@ -3,7 +3,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ChevronLeft, ChevronRight, Wrench, Code, Function, BookOpen } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Wrench, Code, BookOpen } from 'lucide-react';
 import { Tool } from '@/services/api';
 
 interface SidebarProps {
@@ -50,7 +50,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ tools, collapsed, onToggle }) 
                   {tool.functions && tool.functions.length > 0 && (
                     <div>
                       <div className="flex items-center text-xs font-medium text-gray-700 mb-2">
-                        <Function className="w-3 h-3 mr-1" />
+                        <Code className="w-3 h-3 mr-1" />
                         Functions
                       </div>
                       <div className="space-y-2">

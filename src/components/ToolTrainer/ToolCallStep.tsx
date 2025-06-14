@@ -219,10 +219,9 @@ export const ToolCallStep: React.FC<ToolCallStepProps> = ({
               </SelectTrigger>
               <SelectContent>
                 {availableTools.map((tool) => (
-                  <SelectItem key={tool.name} value={tool.name}>
+                  <SelectItem key={tool.tool_name} value={tool.tool_name}>
                     <div className="flex flex-col">
-                      <span className="font-medium">{tool.name}</span>
-                      <span className="text-xs text-gray-500">{tool.description}</span>
+                      <span className="font-medium">{tool.tool_name}</span>
                     </div>
                   </SelectItem>
                 ))}
