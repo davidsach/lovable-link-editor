@@ -84,6 +84,13 @@ export interface ToolExecuteResponse {
 }
 
 // Training example types
+export interface Step {
+  thought: string;
+  tool_name: string;
+  tool_params: Record<string, any>;
+  tool_result: string;
+}
+
 export interface TrainingStep {
   thought: string;
   tool_name: string;
