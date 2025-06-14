@@ -6,7 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Trash2, Download, Calendar, MessageSquare } from 'lucide-react';
-import { conversationService, SavedConversation } from '../../services/conversationService';
+import { conversationService } from '../../services/conversationService';
+import { SavedConversation } from '../../types/toolTrainer';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 
 interface SavedConversationsProps {
@@ -107,7 +108,7 @@ export const SavedConversations: React.FC<SavedConversationsProps> = ({ onLoadCo
                     <div className="flex items-center gap-4 text-sm text-gray-500">
                       <div className="flex items-center gap-1">
                         <Calendar className="w-4 h-4" />
-                        {new Date(conversation.createdAt).toLocaleDateString()}
+                        {new Date(conversation.created_at).toLocaleDateString()}
                       </div>
                       <Badge variant="outline">
                         {conversation.messages.length} messages
