@@ -29,7 +29,8 @@ import {
   Settings,
   Loader2,
   CheckCircle,
-  PlayCircle
+  PlayCircle,
+  Trash2
 } from 'lucide-react';
 import { useTools, useExecuteToolResult } from '@/hooks/useApi';
 import { Tool, Message, ConversationState } from '@/types/toolTrainer';
@@ -149,12 +150,11 @@ const ToolTrainer = () => {
   const [newTag, setNewTag] = useState('');
   const [expandedTools, setExpandedTools] = useState<Record<string, boolean>>({});
   const [currentStep, setCurrentStep] = useState<'user' | 'assistant'>('user');
-  const [showTextChunk, setShowTextChunk] = useState(false);
-  const [showToolCall, setShowToolCall] = useState(false);
   const [messageContent, setMessageContent] = useState('');
   const [toolCalls, setToolCalls] = useState<ToolCall[]>([]);
   const [currentExampleId, setCurrentExampleId] = useState(1);
   const [hasAddedTextChunk, setHasAddedTextChunk] = useState(false);
+  const [showTextChunkInput, setShowTextChunkInput] = useState(false);
 
   const { data: tools, isLoading: toolsLoading, error: toolsError } = useTools();
   const executeToolMutation = useExecuteToolResult();
@@ -180,9 +180,8 @@ const ToolTrainer = () => {
   };
 
   const addNewTurn = () => {
-    // Reset all states for new turn
-    setShowTextChunk(false);
-    setShowToolCall(false);
+    // Reset states for new turn
+    setShowTextChunkInput(false);
     setMessageContent('');
     setHasAddedTextChunk(false);
     setToolCalls([]);
@@ -206,9 +205,13 @@ const ToolTrainer = () => {
       }));
       
       setMessageContent('');
-      setShowTextChunk(false);
+      setShowTextChunkInput(false);
       setHasAddedTextChunk(true);
     }
+  };
+
+  const showTextChunkEditor = () => {
+    setShowTextChunkInput(true);
   };
 
   const addToolCall = () => {
@@ -222,7 +225,6 @@ const ToolTrainer = () => {
     };
     
     setToolCalls([...toolCalls, newToolCall]);
-    setShowToolCall(true);
   };
 
   const updateToolCall = (index: number, updates: Partial<ToolCall>) => {
@@ -236,16 +238,14 @@ const ToolTrainer = () => {
     updateToolCall(index, { status: 'executing' });
     
     try {
-      const result = await executeToolMutation.mutateAsync({
-        code: toolCall.pythonCode
-      });
+      // This would be the actual backend call
+      // For now, just simulate with a timeout
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
-      const formattedResult = typeof result.code_output === 'object' 
-        ? JSON.stringify(result.code_output, null, 2)
-        : String(result.code_output);
-        
+      const mockResult = `Mock result for tool: ${toolCall.toolName}\nCode executed: ${toolCall.pythonCode.slice(0, 50)}...`;
+      
       updateToolCall(index, { 
-        result: formattedResult,
+        result: mockResult,
         status: 'completed'
       });
     } catch (error) {
@@ -268,9 +268,6 @@ const ToolTrainer = () => {
 
   const removeToolCall = (index: number) => {
     setToolCalls(prev => prev.filter((_, i) => i !== index));
-    if (toolCalls.length === 1) {
-      setShowToolCall(false);
-    }
   };
 
   const navigatePrevious = () => {
@@ -283,25 +280,17 @@ const ToolTrainer = () => {
     setCurrentExampleId(currentExampleId + 1);
   };
 
-  const canAddToolCall = () => {
-    return currentStep === 'assistant' && (toolCalls.length === 0 || toolCalls.every(tc => tc.status === 'completed' || tc.status === 'failed'));
-  };
-
+  // Check if user can add text chunk (only once per turn for user)
   const canAddTextChunk = () => {
     if (currentStep === 'user') {
-      return !hasAddedTextChunk;
+      return !hasAddedTextChunk && !showTextChunkInput;
     }
-    return true; // Assistant can always add text chunks
+    return !showTextChunkInput; // Assistant can add multiple times but not when input is showing
   };
 
-  const hasValidationErrors = () => {
-    if (currentStep === 'user') {
-      return !messageContent.trim() && showTextChunk;
-    } else {
-      if (showTextChunk && !messageContent.trim()) return true;
-      if (showToolCall && toolCalls.some(tc => !tc.toolName || !tc.pythonCode.trim())) return true;
-    }
-    return false;
+  // Check if assistant can add tool call
+  const canAddToolCall = () => {
+    return currentStep === 'assistant';
   };
 
   const getPendingToolCallsCount = () => {
@@ -519,12 +508,6 @@ const ToolTrainer = () => {
                 <Badge variant="outline" className="bg-blue-600 text-white border-blue-500">
                   Current
                 </Badge>
-                {hasValidationErrors() && (
-                  <Badge variant="destructive" className="bg-red-600 text-white">
-                    <AlertTriangle className="w-3 h-3 mr-1" />
-                    Validation Error
-                  </Badge>
-                )}
                 {currentStep === 'user' && hasAddedTextChunk && (
                   <Badge variant="default" className="bg-green-600 text-white">
                     <CheckCircle className="w-3 h-3 mr-1" />
@@ -533,17 +516,17 @@ const ToolTrainer = () => {
                 )}
               </div>
               <Badge variant="outline" className="border-gray-500 text-gray-300">
-                {showTextChunk || toolCalls.length > 0 ? 'Active' : 'Waiting for input'}
+                {showTextChunkInput || toolCalls.length > 0 ? 'Active' : 'Waiting for input'}
               </Badge>
             </div>
 
             {/* Text Chunk Input */}
-            {showTextChunk && (
-              <div className="space-y-3">
+            {showTextChunkInput && (
+              <div className="space-y-3 mb-4">
                 <div className="flex items-center justify-between">
                   <label className="text-sm font-medium text-gray-300">Message Content</label>
                   <Button 
-                    onClick={() => setShowTextChunk(false)}
+                    onClick={() => setShowTextChunkInput(false)}
                     variant="ghost"
                     size="sm"
                     className="text-gray-400 hover:text-white"
@@ -569,7 +552,7 @@ const ToolTrainer = () => {
             )}
 
             {/* Tool Calls */}
-            {showToolCall && toolCalls.map((toolCall, index) => (
+            {toolCalls.map((toolCall, index) => (
               <div key={toolCall.id} className="space-y-3 border-t border-gray-600 pt-3 mt-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -590,7 +573,7 @@ const ToolTrainer = () => {
                     size="sm"
                     className="text-red-400 hover:text-red-300"
                   >
-                    Remove
+                    <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
                 
@@ -712,6 +695,7 @@ const ToolTrainer = () => {
           {/* Bottom Action Bar */}
           <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg border border-gray-700">
             <div className="flex items-center gap-3">
+              {/* New Turn Button */}
               <Button 
                 onClick={addNewTurn}
                 className="bg-blue-600 hover:bg-blue-700 text-white"
@@ -720,41 +704,35 @@ const ToolTrainer = () => {
                 New Turn
               </Button>
 
-              {/* Show appropriate buttons based on current step */}
-              {!showTextChunk && !showToolCall && (
-                <>
-                  {/* Text chunk button - available based on role and state */}
-                  <Button 
-                    onClick={() => setShowTextChunk(true)}
-                    disabled={!canAddTextChunk()}
-                    variant="outline"
-                    className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 disabled:opacity-50"
-                  >
-                    <FileText className="w-4 h-4 mr-2" />
-                    Add Text Chunk
-                  </Button>
-                  
-                  {/* Tool call button - only available for assistant */}
-                  {currentStep === 'assistant' && (
-                    <Button 
-                      onClick={addToolCall}
-                      disabled={!canAddToolCall()}
-                      variant="outline"
-                      className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 disabled:opacity-50"
-                    >
-                      <Settings className="w-4 h-4 mr-2" />
-                      Add Tool Call
-                    </Button>
-                  )}
-                </>
+              {/* Add Text Chunk Button */}
+              <Button 
+                onClick={showTextChunkEditor}
+                disabled={!canAddTextChunk()}
+                variant="outline"
+                className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 disabled:opacity-50"
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                Add Text Chunk
+              </Button>
+              
+              {/* Add Tool Call Button - Only for Assistant */}
+              {canAddToolCall() && (
+                <Button 
+                  onClick={addToolCall}
+                  variant="outline"
+                  className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
+                >
+                  <Settings className="w-4 h-4 mr-2" />
+                  Add Tool Call
+                </Button>
               )}
 
               {/* Status messages */}
               {currentStep === 'user' && hasAddedTextChunk && (
                 <p className="text-green-400 text-xs">✓ Text chunk added. Switch to new turn to continue.</p>
               )}
-              {currentStep === 'assistant' && !canAddToolCall() && toolCalls.length > 0 && (
-                <p className="text-yellow-400 text-xs">Complete previous tool call before adding another</p>
+              {currentStep === 'user' && !canAddTextChunk() && !hasAddedTextChunk && (
+                <p className="text-yellow-400 text-xs">User can add only one text chunk per turn</p>
               )}
             </div>
 
