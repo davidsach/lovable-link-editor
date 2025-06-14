@@ -1,11 +1,5 @@
-interface SavedConversation {
-  id: string;
-  name: string;
-  description: string;
-  messages: any[];
-  createdAt: string;
-  updatedAt: string;
-}
+
+import { SavedConversation } from '../types/toolTrainer';
 
 interface PythonExecutionRequest {
   code: string;
@@ -24,13 +18,12 @@ class ConversationService {
   private readonly API_BASE_URL = 'http://localhost:8000'; // Your backend API URL
 
   // Save conversation locally
-  saveConversation(conversation: Omit<SavedConversation, 'id' | 'createdAt' | 'updatedAt'>): SavedConversation {
+  saveConversation(conversation: Omit<SavedConversation, 'id' | 'created_at'>): SavedConversation {
     const saved = this.getSavedConversations();
     const newConversation: SavedConversation = {
       ...conversation,
       id: `conv_${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      created_at: new Date().toISOString()
     };
     
     saved.push(newConversation);
@@ -88,4 +81,4 @@ class ConversationService {
 }
 
 export const conversationService = new ConversationService();
-export type { SavedConversation, PythonExecutionRequest, PythonExecutionResponse };
+export type { PythonExecutionRequest, PythonExecutionResponse };
