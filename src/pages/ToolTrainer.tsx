@@ -718,7 +718,7 @@ const ToolTrainer = () => {
                                       ...prev,
                                       messages: prev.messages.map(msg => 
                                         msg.id === message.id ? updatedMessage : msg
-                                      ))
+                                      )
                                     }));
                                   }}
                                   className="h-6 w-6 p-0 text-gray-400 hover:text-red-500"
@@ -743,7 +743,7 @@ const ToolTrainer = () => {
                                     ...prev,
                                     messages: prev.messages.map(msg => 
                                       msg.id === message.id ? updatedMessage : msg
-                                    ))
+                                    )
                                   }));
                                 }}
                                 placeholder="Enter message content..."
@@ -768,7 +768,7 @@ const ToolTrainer = () => {
                                       ...prev,
                                       messages: prev.messages.map(msg => 
                                         msg.id === message.id ? updatedMessage : msg
-                                      ))
+                                      )
                                     }));
                                   }}
                                   placeholder="# Write your Python code here..."
