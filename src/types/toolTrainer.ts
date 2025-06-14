@@ -2,12 +2,31 @@
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
-  content: Array<{
-    type: 'text' | 'tool_call' | 'tool_result';
-    content: string;
-    tool_name?: string;
-    tool_id?: string;
-  }>;
+  content: string;
+  timestamp: Date;
+}
+
+export interface ToolCall {
+  id: string;
+  toolName: string;
+  parameters: Record<string, any>;
+  result: any;
+  status: 'pending' | 'executing' | 'completed' | 'failed';
+  timestamp: Date;
+}
+
+export interface ConversationState {
+  id: string;
+  title: string;
+  messages: Message[];
+  toolCalls: ToolCall[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Tool {
+  name: string;
+  description: string;
 }
 
 export interface TrainingExample {

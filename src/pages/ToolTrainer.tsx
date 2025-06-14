@@ -84,7 +84,7 @@ const ToolTrainer = () => {
 
     const newToolCall: ToolCall = {
       id: `tool_${Date.now()}`,
-      toolName: tools[0].name,
+      toolName: tools[0].tool_name || tools[0].name,
       parameters: {},
       result: null,
       status: 'pending',
@@ -194,28 +194,30 @@ const ToolTrainer = () => {
     setIsExecuting(true);
     
     try {
-      const toolCallsData = pendingToolCalls.map(call => ({
-        tool_name: call.toolName,
-        parameters: call.parameters
-      }));
+      const toolCallsData = {
+        code_chunks: pendingToolCalls.map((call, index) => ({
+          chunk_id: index,
+          code: `# Execute ${call.toolName} with parameters: ${JSON.stringify(call.parameters)}`
+        }))
+      };
 
-      const results = await executeAllTools.mutateAsync({
-        tool_calls: toolCallsData
-      });
+      const results = await executeAllTools.mutateAsync(toolCallsData);
 
       // Update tool calls with results
-      results.forEach((result, index) => {
-        const toolCall = pendingToolCalls[index];
-        updateToolCall(toolCall.id, {
-          result: result,
-          status: result.error ? 'failed' : 'completed'
+      if (results.code_chunk_output) {
+        results.code_chunk_output.forEach((result, index) => {
+          const toolCall = pendingToolCalls[index];
+          updateToolCall(toolCall.id, {
+            result: result.code_output,
+            status: result.code_output.error ? 'failed' : 'completed'
+          });
         });
-      });
 
-      toast({
-        title: 'Tools Executed',
-        description: `Successfully executed ${results.length} tools`,
-      });
+        toast({
+          title: 'Tools Executed',
+          description: `Successfully executed ${results.code_chunk_output.length} tools`,
+        });
+      }
     } catch (error) {
       pendingToolCalls.forEach(call => {
         updateToolCall(call.id, {
@@ -290,7 +292,7 @@ const ToolTrainer = () => {
   );
 
   const renderToolCall = (toolCall: ToolCall) => {
-    const tool = tools?.find(t => t.name === toolCall.toolName);
+    const tool = tools?.find(t => (t.tool_name || t.name) === toolCall.toolName);
     
     return (
       <Card key={toolCall.id} className="mb-4">
@@ -342,8 +344,8 @@ const ToolTrainer = () => {
               </SelectTrigger>
               <SelectContent>
                 {tools?.map(tool => (
-                  <SelectItem key={tool.name} value={tool.name}>
-                    {tool.name}
+                  <SelectItem key={tool.tool_name || tool.name} value={tool.tool_name || tool.name}>
+                    {tool.tool_name || tool.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -534,9 +536,11 @@ const ToolTrainer = () => {
                 ) : tools && tools.length > 0 ? (
                   <div className="space-y-2">
                     {tools.map(tool => (
-                      <div key={tool.name} className="p-3 border rounded-lg">
-                        <div className="font-medium text-sm">{tool.name}</div>
-                        <div className="text-xs text-gray-600 mt-1">{tool.description}</div>
+                      <div key={tool.tool_name || tool.name} className="p-3 border rounded-lg">
+                        <div className="font-medium text-sm">{tool.tool_name || tool.name}</div>
+                        <div className="text-xs text-gray-600 mt-1">
+                          {tool.functions?.[0]?.func_name || 'No description available'}
+                        </div>
                       </div>
                     ))}
                   </div>
