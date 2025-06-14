@@ -110,7 +110,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ tools, collapsed, onToggle }) 
             ))
           ) : (
             <div className="space-y-4">
-              <div className="text-sm text-gray-500 text-center">Loading tools...</div>
+              <div className="text-sm text-gray-500 text-center">
+                {tools.length === 0 ? 'No tools available' : 'Loading tools...'}
+              </div>
             </div>
           )}
         </div>

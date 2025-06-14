@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Sidebar } from '@/components/ToolTrainer/Sidebar';
@@ -11,7 +12,81 @@ import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { ErrorDisplay } from '@/components/ui/error-display';
 import { useToolTrainerLogic } from '@/hooks/useToolTrainerLogic';
 import { Message, TrainingExample } from '@/types/toolTrainer';
-import { CodeChunk } from '@/services/api';
+import { Tool, CodeChunk } from '@/services/api';
+
+// Mock tools data for when API fails
+const mockTools: Tool[] = [
+  {
+    tool_name: "email_api_tool",
+    functions: [
+      {
+        func_name: "send_email",
+        params: [
+          { param_name: "to", param_type: "str", is_required: true, default_value: "" },
+          { param_name: "subject", param_type: "str", is_required: true, default_value: "" },
+          { param_name: "body", param_type: "str", is_required: true, default_value: "" }
+        ],
+        return_value: { param_name: "success", param_type: "bool", is_required: true, default_value: "True" }
+      }
+    ],
+    classes: []
+  },
+  {
+    tool_name: "contact_api_tool",
+    functions: [
+      {
+        func_name: "get_contact",
+        params: [
+          { param_name: "name", param_type: "str", is_required: true, default_value: "" }
+        ],
+        return_value: { param_name: "contact", param_type: "dict", is_required: true, default_value: "{}" }
+      }
+    ],
+    classes: []
+  },
+  {
+    tool_name: "drive_api_tool",
+    functions: [
+      {
+        func_name: "upload_file",
+        params: [
+          { param_name: "file_path", param_type: "str", is_required: true, default_value: "" },
+          { param_name: "folder_id", param_type: "str", is_required: false, default_value: "" }
+        ],
+        return_value: { param_name: "file_id", param_type: "str", is_required: true, default_value: "" }
+      }
+    ],
+    classes: []
+  },
+  {
+    tool_name: "calendar_api_tool",
+    functions: [
+      {
+        func_name: "create_event",
+        params: [
+          { param_name: "title", param_type: "str", is_required: true, default_value: "" },
+          { param_name: "start_time", param_type: "str", is_required: true, default_value: "" },
+          { param_name: "end_time", param_type: "str", is_required: true, default_value: "" }
+        ],
+        return_value: { param_name: "event_id", param_type: "str", is_required: true, default_value: "" }
+      }
+    ],
+    classes: []
+  },
+  {
+    tool_name: "weather_tool",
+    functions: [
+      {
+        func_name: "get_weather",
+        params: [
+          { param_name: "location", param_type: "str", is_required: true, default_value: "" }
+        ],
+        return_value: { param_name: "weather_data", param_type: "dict", is_required: true, default_value: "{}" }
+      }
+    ],
+    classes: []
+  }
+];
 
 const ToolTrainer = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -27,7 +102,7 @@ const ToolTrainer = () => {
     action: () => {}
   });
 
-  const { data: tools = [], isLoading: toolsLoading } = useTools();
+  const { data: tools = [], isLoading: toolsLoading, error: toolsError } = useTools();
   
   const {
     currentExample,
@@ -53,37 +128,8 @@ const ToolTrainer = () => {
     validateMessages
   } = useToolTrainerLogic();
 
-  const availableTools = tools.length > 0 ? tools : [];
-
-  const navigateToPreviousExample = () => {
-    if (currentExample.id > 1) {
-      setCurrentExample(prev => ({
-        ...prev,
-        id: prev.id - 1,
-        name: `Example ${prev.id - 1}`,
-        messages: [],
-        metadata: {
-          ...prev.metadata,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
-      }));
-    }
-  };
-
-  const navigateToNextExample = () => {
-    setCurrentExample(prev => ({
-      ...prev,
-      id: prev.id + 1,
-      name: `Example ${prev.id + 1}`,
-      messages: [],
-      metadata: {
-        ...prev.metadata,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }
-    }));
-  };
+  // Use mock tools if API fails or returns empty array
+  const availableTools = tools.length > 0 ? tools : mockTools;
 
   const addNewTurn = () => {
     if (currentExample.messages.length > 0) {
@@ -441,60 +487,6 @@ const ToolTrainer = () => {
     });
   };
 
-  const loadExample = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const example = JSON.parse(e.target?.result as string);
-          setCurrentExample(example);
-        } catch (error) {
-          console.error('Error parsing JSON:', error);
-        }
-      };
-      reader.readAsText(file);
-    }
-  };
-
-  const autoGenerateExample = async () => {
-    setIsLoading(true);
-    setTimeout(() => {
-      const newExample: TrainingExample = {
-        id: Math.floor(Math.random() * 1000) + 1,
-        name: 'Auto-generated Example',
-        description: 'Automatically generated training example',
-        messages: [
-          {
-            id: 'msg_1',
-            role: 'user',
-            content: [{ type: 'text', content: 'Help me find the definition of a function in my codebase.' }]
-          },
-          {
-            id: 'msg_2',
-            role: 'assistant',
-            content: [
-              { type: 'text', content: 'I\'ll help you find the function definition. Let me search your codebase.' },
-              { 
-                type: 'tool_call', 
-                content: '# Search for function definition\nresult = codenav_api.find_definition(\n    symbol="main",\n    file_path="src/app.py"\n)',
-                tool_name: 'codenav_api',
-                tool_id: 'tool_auto_1'
-              }
-            ]
-          }
-        ],
-        metadata: {
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          tags: ['auto-generated', 'code-search']
-        }
-      };
-      setCurrentExample(newExample);
-      setIsLoading(false);
-    }, 1000);
-  };
-
   const validationErrors = validateMessages();
   const canSubmit = validateMessages().length === 0 && currentExample.messages.length > 0 && !hasErrors;
   
@@ -622,9 +614,9 @@ const ToolTrainer = () => {
                   const error = errors.find(e => e.id === errorId);
                   if (error?.field?.startsWith('execution-')) {
                     const toolId = error.field.replace('execution-', '');
-                    // getToolResult(toolId);
+                    getToolResult(toolId);
                   } else if (error?.field === 'submission') {
-                    // submitExample();
+                    submitExample();
                   }
                   clearErrors();
                 }}
@@ -648,9 +640,7 @@ const ToolTrainer = () => {
                           )
                         }));
                       }}
-                      onGetToolResult={async (toolId: string) => {
-                        // Implementation remains the same as before
-                      }}
+                      onGetToolResult={getToolResult}
                       isLoading={isLoading}
                       availableTools={availableTools}
                       isFirstMessage={index === 0}
@@ -661,11 +651,43 @@ const ToolTrainer = () => {
                   {currentExample.messages.length === 0 && (
                     <EmptyState
                       isLoading={isLoading}
-                      onAddNewTurn={() => {
-                        // Add new turn implementation
-                      }}
+                      onAddNewTurn={addNewTurn}
                       onAutoGenerate={async () => {
-                        // Auto generate implementation
+                        setIsLoading(true);
+                        setTimeout(() => {
+                          const newExample: TrainingExample = {
+                            id: Math.floor(Math.random() * 1000) + 1,
+                            name: 'Auto-generated Example',
+                            description: 'Automatically generated training example',
+                            messages: [
+                              {
+                                id: 'msg_1',
+                                role: 'user',
+                                content: [{ type: 'text', content: 'Help me send an email using the email API.' }]
+                              },
+                              {
+                                id: 'msg_2',
+                                role: 'assistant',
+                                content: [
+                                  { type: 'text', content: 'I\'ll help you send an email. Let me use the email API.' },
+                                  { 
+                                    type: 'tool_call', 
+                                    content: '# Send email using email API\nemail_api_tool.send_email(\n    to="user@example.com",\n    subject="Hello World",\n    body="This is a test email."\n)',
+                                    tool_name: 'email_api_tool',
+                                    tool_id: 'tool_auto_1'
+                                  }
+                                ]
+                              }
+                            ],
+                            metadata: {
+                              created_at: new Date().toISOString(),
+                              updated_at: new Date().toISOString(),
+                              tags: ['auto-generated', 'email']
+                            }
+                          };
+                          setCurrentExample(newExample);
+                          setIsLoading(false);
+                        }, 1000);
                       }}
                     />
                   )}
@@ -679,29 +701,17 @@ const ToolTrainer = () => {
           sidebarCollapsed={sidebarCollapsed}
           currentExample={currentExample}
           isLoading={isLoading}
-          canSubmit={validateMessages().length === 0 && currentExample.messages.length > 0 && !hasErrors}
-          canAddTextChunk={currentExample.messages.length > 0}
-          canAddToolCall={true}
+          canSubmit={canSubmit}
+          canAddTextChunk={canAddTextChunk}
+          canAddToolCall={canAddToolCall}
           historyLength={history.length}
           isSaving={createExampleMutation.isPending || updateExampleMutation.isPending}
-          onAddNewTurn={() => {
-            // Add new turn implementation
-          }}
-          onAddTextChunk={() => {
-            // Add text chunk implementation
-          }}
-          onAddToolCall={() => {
-            // Add tool call implementation
-          }}
-          onGetAllResults={async () => {
-            // Get all results implementation
-          }}
-          onGoBack={() => {
-            // Go back implementation
-          }}
-          onSubmitExample={async () => {
-            // Submit example implementation
-          }}
+          onAddNewTurn={addNewTurn}
+          onAddTextChunk={addTextChunk}
+          onAddToolCall={addToolCall}
+          onGetAllResults={getAllResults}
+          onGoBack={goBack}
+          onSubmitExample={submitExample}
         />
 
         <ConfirmationDialog
