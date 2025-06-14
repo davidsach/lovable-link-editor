@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
@@ -96,7 +95,7 @@ const ToolTrainer = () => {
   });
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [history, setHistory] = useState<Message[][]>([]);
+  const [history, setHistory] = useState<TrainingExample[]>([]);
   const [confirmationDialog, setConfirmationDialog] = useState<{
     open: boolean;
     title: string;
@@ -121,7 +120,7 @@ const ToolTrainer = () => {
 
   // Helper functions
   const saveToHistory = () => {
-    setHistory(prev => [...prev, currentExample.messages]);
+    setHistory(prev => [...prev, { ...currentExample }]);
   };
 
   const convertToApiFormat = (example: TrainingExample): CreateExampleRequest => {
@@ -234,7 +233,11 @@ const ToolTrainer = () => {
       ...prev,
       messages: prev.messages.map(msg => 
         msg.id === lastMessage.id ? updatedMessage : msg
-      )
+      ),
+      metadata: {
+        ...prev.metadata,
+        updated_at: new Date().toISOString()
+      }
     }));
   };
 
@@ -260,8 +263,20 @@ const ToolTrainer = () => {
       ...prev,
       messages: prev.messages.map(msg => 
         msg.id === lastMessage.id ? updatedMessage : msg
-      )
+      ),
+      metadata: {
+        ...prev.metadata,
+        updated_at: new Date().toISOString()
+      }
     }));
+  };
+
+  const handleBack = () => {
+    if (history.length > 0) {
+      const previousState = history[history.length - 1];
+      setCurrentExample(previousState);
+      setHistory(prev => prev.slice(0, -1)); // Remove the last state from history
+    }
   };
 
   const getToolResult = async (toolId: string) => {
@@ -753,15 +768,7 @@ const ToolTrainer = () => {
                 </Button>
                 
                 <Button 
-                  onClick={() => {
-                    if (history.length > 0) {
-                      const previousState = history[history.length - 1];
-                      setCurrentExample(prev => ({
-                        ...prev,
-                        messages: previousState
-                      }));
-                    }
-                  }}
+                  onClick={handleBack}
                   variant="outline"
                   disabled={history.length === 0}
                 >
