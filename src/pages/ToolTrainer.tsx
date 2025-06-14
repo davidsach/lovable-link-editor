@@ -269,9 +269,9 @@ const ToolTrainer = () => {
   };
 
   const executeAllToolCalls = async () => {
-    const pendingToolCalls = toolCalls.filter(tc => tc.status === 'pending' && tc.pythonCode.trim());
+    const executableToolCalls = toolCalls.filter(tc => tc.pythonCode.trim() && tc.status !== 'completed' && tc.status !== 'executing');
     
-    for (const toolCall of pendingToolCalls) {
+    for (const toolCall of executableToolCalls) {
       const index = toolCalls.findIndex(tc => tc.id === toolCall.id);
       await executeToolCall(index);
     }
@@ -302,9 +302,9 @@ const ToolTrainer = () => {
   // Check if user can add text chunk (only once per turn for user)
   const canAddTextChunk = () => {
     if (currentStep === 'user') {
-      return !hasAddedTextChunk && !showTextChunkInput;
+      return !hasAddedTextChunk;
     }
-    return !showTextChunkInput; // Assistant can add multiple times but not when input is showing
+    return true; // Assistant can add multiple times
   };
 
   // Check if assistant can add tool call
@@ -312,8 +312,8 @@ const ToolTrainer = () => {
     return currentStep === 'assistant';
   };
 
-  const getPendingToolCallsCount = () => {
-    return toolCalls.filter(tc => tc.status === 'pending' && tc.pythonCode.trim()).length;
+  const getExecutableToolCallsCount = () => {
+    return toolCalls.filter(tc => tc.pythonCode.trim() && tc.status !== 'completed' && tc.status !== 'executing').length;
   };
 
   const getExecutingToolCallsCount = () => {
@@ -321,7 +321,7 @@ const ToolTrainer = () => {
   };
 
   const canExecuteAllToolCalls = () => {
-    return currentStep === 'assistant' && getPendingToolCallsCount() > 1 && getExecutingToolCallsCount() === 0;
+    return currentStep === 'assistant' && getExecutableToolCallsCount() > 1 && getExecutingToolCallsCount() === 0;
   };
 
   const handleSaveConversation = () => {
@@ -473,15 +473,24 @@ const ToolTrainer = () => {
                   </div>
                   Training Example
                 </CardTitle>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="bg-blue-500/20 border-blue-400/50 text-blue-300 hover:bg-blue-500/30 transition-all duration-200">
-                    <Upload className="w-4 h-4 mr-2" />
-                    Load Example
-                  </Button>
-                  <Button variant="outline" size="sm" className="bg-purple-500/20 border-purple-400/50 text-purple-300 hover:bg-purple-500/30 transition-all duration-200">
-                    <Sparkles className="w-4 h-4 mr-2" />
-                    Auto Generate
-                  </Button>
+                <div className="flex items-center gap-3">
+                  {currentStep === 'user' ? (
+                    <div className="flex items-center gap-2 bg-blue-500/20 px-4 py-2 rounded-full border border-blue-400/50">
+                      <User className="w-5 h-5 text-blue-400" />
+                      <span className="font-medium text-blue-300">User Turn</span>
+                      <Badge variant="outline" className="bg-blue-600/30 text-blue-200 border-blue-400/50 ml-2">
+                        Current
+                      </Badge>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 bg-green-500/20 px-4 py-2 rounded-full border border-green-400/50">
+                      <Bot className="w-5 h-5 text-green-400" />
+                      <span className="font-medium text-green-300">Assistant Turn</span>
+                      <Badge variant="outline" className="bg-green-600/30 text-green-200 border-green-400/50 ml-2">
+                        Current
+                      </Badge>
+                    </div>
+                  )}
                 </div>
               </div>
             </CardHeader>
@@ -752,7 +761,7 @@ const ToolTrainer = () => {
                           ) : (
                             <PlayCircle className="w-4 h-4 mr-2" />
                           )}
-                          Get All Results ({getPendingToolCallsCount()})
+                          Get All Results ({getExecutableToolCallsCount()})
                         </Button>
                       )}
                     </div>
@@ -909,7 +918,7 @@ const ToolTrainer = () => {
               {/* Add Text Chunk Button */}
               <Button 
                 onClick={showTextChunkEditor}
-                disabled={!canAddTextChunk()}
+                disabled={!canAddTextChunk() || showTextChunkInput}
                 variant="outline"
                 className="bg-gray-700/80 border-gray-600/50 text-white hover:bg-gray-600/80 hover:border-blue-400/50 disabled:opacity-50 shadow-lg transition-all duration-200 px-6"
               >
@@ -929,7 +938,7 @@ const ToolTrainer = () => {
                 </Button>
               )}
 
-              {/* Get All Tool Results Button - Only for assistant with multiple pending tool calls */}
+              {/* Get All Tool Results Button - Only for assistant with multiple executable tool calls */}
               {canExecuteAllToolCalls() && (
                 <Button 
                   onClick={executeAllToolCalls}
@@ -941,7 +950,7 @@ const ToolTrainer = () => {
                   ) : (
                     <PlayCircle className="w-4 h-4 mr-2" />
                   )}
-                  Get All Results ({getPendingToolCallsCount()})
+                  Get All Results ({getExecutableToolCallsCount()})
                 </Button>
               )}
             </div>
@@ -982,7 +991,7 @@ const ToolTrainer = () => {
                   </p>
                 </div>
               )}
-              {currentStep === 'user' && !canAddTextChunk() && !hasAddedTextChunk && (
+              {currentStep === 'user' && !canAddTextChunk() && !hasAddedTextChunk && showTextChunkInput && (
                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
                   <p className="text-blue-300 flex items-center justify-center">
                     <MessageSquare className="w-4 h-4 mr-2" />
