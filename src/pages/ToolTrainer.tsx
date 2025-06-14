@@ -41,7 +41,7 @@ import { Tool, Message, ConversationState } from '@/types/toolTrainer';
 import { SaveConversationDialog } from '@/components/ToolTrainer/SaveConversationDialog';
 import { SavedConversations } from '@/components/ToolTrainer/SavedConversations';
 
-// Mock tools data
+// Mock tools data - This will be replaced with real API data
 const mockTools: Tool[] = [
   {
     tool_name: 'contact_api_tool',
@@ -176,6 +176,11 @@ interface ToolCall {
 }
 
 const ToolTrainer = () => {
+  // =============================================================================
+  // STATE MANAGEMENT
+  // =============================================================================
+  
+  // Core conversation state
   const [conversation, setConversation] = useState<ConversationState>({
     id: '1',
     title: 'Example 1',
@@ -185,30 +190,48 @@ const ToolTrainer = () => {
     updatedAt: new Date()
   });
 
+  // Form fields
   const [exampleName, setExampleName] = useState('Example 1');
   const [description, setDescription] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
+  
+  // UI state
   const [expandedTools, setExpandedTools] = useState<Record<string, boolean>>({});
-  const [currentStep, setCurrentStep] = useState<'user' | 'assistant'>('user');
-  const [messageContent, setMessageContent] = useState('');
-  const [toolCalls, setToolCalls] = useState<ToolCall[]>([]);
-  const [currentExampleId, setCurrentExampleId] = useState(1);
-  const [hasAddedTextChunk, setHasAddedTextChunk] = useState(false);
   const [showTextChunkInput, setShowTextChunkInput] = useState(false);
+  const [messageContent, setMessageContent] = useState('');
+  
+  // Turn management
+  const [currentStep, setCurrentStep] = useState<'user' | 'assistant'>('user');
+  const [hasAddedTextChunk, setHasAddedTextChunk] = useState(false);
   const [conversationStarted, setConversationStarted] = useState(false);
-
+  
+  // Tool calls
+  const [toolCalls, setToolCalls] = useState<ToolCall[]>([]);
+  
+  // Navigation
+  const [currentExampleId, setCurrentExampleId] = useState(1);
+  
+  // History for step-wise back functionality
   const [conversationHistory, setConversationHistory] = useState<{
     messages: Message[];
     toolCalls: ToolCall[];
     step: 'user' | 'assistant';
   }[]>([]);
 
+  // =============================================================================
+  // API HOOKS
+  // =============================================================================
+  
   const { data: tools, isLoading: toolsLoading, error: toolsError } = useTools();
   const executeToolMutation = useExecuteToolResult();
   const isConnected = !toolsError;
   const availableTools = tools || mockTools;
 
+  // =============================================================================
+  // UI HELPER FUNCTIONS
+  // =============================================================================
+  
   const toggleToolExpansion = (toolName: string) => {
     setExpandedTools(prev => ({
       ...prev,
@@ -227,6 +250,10 @@ const ToolTrainer = () => {
     setTags(tags.filter(tag => tag !== tagToRemove));
   };
 
+  // =============================================================================
+  // CONVERSATION MANAGEMENT
+  // =============================================================================
+  
   const saveCurrentState = () => {
     // Save current state before making changes
     setConversationHistory(prev => [
@@ -240,6 +267,13 @@ const ToolTrainer = () => {
   };
 
   const addNewTurn = () => {
+    // If no conversation started, start with user turn
+    if (!conversationStarted) {
+      setCurrentStep('user');
+      setConversationStarted(true);
+      return;
+    }
+
     // Save current state before switching turns
     saveCurrentState();
     
@@ -282,6 +316,10 @@ const ToolTrainer = () => {
     setShowTextChunkInput(true);
   };
 
+  // =============================================================================
+  // TOOL CALL MANAGEMENT
+  // =============================================================================
+  
   const addToolCall = () => {
     // Check if there's already an incomplete tool call
     const hasIncompleteToolCall = toolCalls.some(tc => 
@@ -315,8 +353,12 @@ const ToolTrainer = () => {
     updateToolCall(index, { status: 'executing' });
     
     try {
-      // This would be the actual backend call
-      // For now, just simulate with a timeout
+      // TODO: Replace with actual backend API call
+      // const result = await executeToolMutation.mutateAsync({
+      //   code: toolCall.pythonCode
+      // });
+      
+      // For now, simulate with timeout
       await new Promise(resolve => setTimeout(resolve, 2000));
       
       const mockResult = `Mock result for tool: ${toolCall.toolName}\nCode executed: ${toolCall.pythonCode.slice(0, 50)}...`;
@@ -335,16 +377,15 @@ const ToolTrainer = () => {
   };
 
   const executeAllToolCalls = async () => {
-    const executableToolCalls = toolCalls.filter(tc => tc.pythonCode.trim() && tc.status !== 'completed' && tc.status !== 'executing');
+    const executableToolCalls = toolCalls.filter(tc => 
+      tc.pythonCode.trim() && tc.status !== 'completed' && tc.status !== 'executing'
+    );
     
-    // Execute tool calls sequentially, one by one
+    // Execute tool calls sequentially
     for (const toolCall of executableToolCalls) {
       const index = toolCalls.findIndex(tc => tc.id === toolCall.id);
-      
-      // Wait for this tool call to complete before moving to the next
       await executeToolCall(index);
-      
-      // Add a small delay between executions to ensure proper state updates
+      // Small delay between executions
       await new Promise(resolve => setTimeout(resolve, 500));
     }
   };
@@ -353,6 +394,10 @@ const ToolTrainer = () => {
     setToolCalls(prev => prev.filter((_, i) => i !== index));
   };
 
+  // =============================================================================
+  // NAVIGATION
+  // =============================================================================
+  
   const navigatePrevious = () => {
     if (currentExampleId > 1) {
       setCurrentExampleId(currentExampleId - 1);
@@ -361,72 +406,6 @@ const ToolTrainer = () => {
 
   const navigateNext = () => {
     setCurrentExampleId(currentExampleId + 1);
-  };
-
-  // Check if new turn can be started
-  const canStartNewTurn = () => {
-    if (!conversationStarted) return false;
-    
-    if (currentStep === 'user') {
-      // User can start new turn if they have added a text chunk
-      return hasAddedTextChunk;
-    } else {
-      // Assistant can start new turn if they have added text chunk OR tool calls
-      return hasAddedTextChunk || toolCalls.length > 0;
-    }
-  };
-
-  // Check if user can add text chunk
-  const canAddTextChunk = () => {
-    if (currentStep === 'user') {
-      // User can only add one text chunk per turn
-      return !hasAddedTextChunk;
-    }
-    // Assistant can add multiple text chunks
-    return true;
-  };
-
-  // Check if assistant can add tool call
-  const canAddToolCall = () => {
-    if (currentStep !== 'assistant') return false;
-    
-    // Check if there's already an incomplete tool call
-    const hasIncompleteToolCall = toolCalls.some(tc => 
-      !tc.toolName || !tc.pythonCode.trim() || tc.status === 'pending'
-    );
-    
-    return !hasIncompleteToolCall;
-  };
-
-  const getExecutableToolCallsCount = () => {
-    return toolCalls.filter(tc => tc.pythonCode.trim() && tc.status !== 'completed' && tc.status !== 'executing').length;
-  };
-
-  const getExecutingToolCallsCount = () => {
-    return toolCalls.filter(tc => tc.status === 'executing').length;
-  };
-
-  const canExecuteAllToolCalls = () => {
-    return getExecutableToolCallsCount() > 0 && getExecutingToolCallsCount() === 0;
-  };
-
-  const handleSaveConversation = () => {
-    // This will be handled by the SaveConversationDialog component
-    console.log('Conversation saved successfully');
-  };
-
-  const handleLoadConversation = (savedConversation: any) => {
-    setConversation({
-      id: savedConversation.id,
-      title: savedConversation.name,
-      messages: savedConversation.messages,
-      toolCalls: [],
-      createdAt: new Date(savedConversation.created_at),
-      updatedAt: new Date(savedConversation.updated_at || savedConversation.created_at)
-    });
-    setExampleName(savedConversation.name);
-    setDescription(savedConversation.description || '');
-    setConversationStarted(savedConversation.messages.length > 0);
   };
 
   const goBackStep = () => {
@@ -464,15 +443,94 @@ const ToolTrainer = () => {
     }
   };
 
+  const goBack = () => {
+    // Navigate back to previous page
+    window.history.back();
+  };
+
+  // =============================================================================
+  // VALIDATION FUNCTIONS
+  // =============================================================================
+  
+  const canStartNewTurn = () => {
+    // If conversation hasn't started, can always start new turn
+    if (!conversationStarted) return true;
+    
+    if (currentStep === 'user') {
+      // User can start new turn if they have added a text chunk
+      return hasAddedTextChunk;
+    } else {
+      // Assistant can start new turn if they have added text chunk OR tool calls
+      return hasAddedTextChunk || toolCalls.length > 0;
+    }
+  };
+
+  const canAddTextChunk = () => {
+    if (currentStep === 'user') {
+      // User can only add one text chunk per turn
+      return !hasAddedTextChunk;
+    }
+    // Assistant can add multiple text chunks
+    return true;
+  };
+
+  const canAddToolCall = () => {
+    if (currentStep !== 'assistant') return false;
+    
+    // Check if there's already an incomplete tool call
+    const hasIncompleteToolCall = toolCalls.some(tc => 
+      !tc.toolName || !tc.pythonCode.trim() || tc.status === 'pending'
+    );
+    
+    return !hasIncompleteToolCall;
+  };
+
+  const getExecutableToolCallsCount = () => {
+    return toolCalls.filter(tc => 
+      tc.pythonCode.trim() && tc.status !== 'completed' && tc.status !== 'executing'
+    ).length;
+  };
+
+  const getExecutingToolCallsCount = () => {
+    return toolCalls.filter(tc => tc.status === 'executing').length;
+  };
+
+  const canExecuteAllToolCalls = () => {
+    return getExecutableToolCallsCount() > 0 && getExecutingToolCallsCount() === 0;
+  };
+
   const canGoBackStep = () => {
     return conversationHistory.length > 0 || conversation.messages.length > 0;
   };
 
-  const goBack = () => {
-    // Navigate back to previous page or reset conversation
-    window.history.back();
+  // =============================================================================
+  // EVENT HANDLERS
+  // =============================================================================
+  
+  const handleSaveConversation = () => {
+    // TODO: Implement actual save functionality with backend
+    console.log('Conversation saved successfully');
   };
 
+  const handleLoadConversation = (savedConversation: any) => {
+    // TODO: Replace with proper type from backend
+    setConversation({
+      id: savedConversation.id,
+      title: savedConversation.name,
+      messages: savedConversation.messages,
+      toolCalls: [],
+      createdAt: new Date(savedConversation.created_at),
+      updatedAt: new Date(savedConversation.updated_at || savedConversation.created_at)
+    });
+    setExampleName(savedConversation.name);
+    setDescription(savedConversation.description || '');
+    setConversationStarted(savedConversation.messages.length > 0);
+  };
+
+  // =============================================================================
+  // RENDER
+  // =============================================================================
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 text-white flex">
       {/* Left Sidebar - Available Tools */}
@@ -730,11 +788,11 @@ const ToolTrainer = () => {
                     <MessageSquare className="w-12 h-12 text-gray-500" />
                   </div>
                   <p className="text-xl mb-3 text-gray-300">Ready to start training</p>
-                  <p className="text-sm text-gray-500">Begin by adding a user message to start the conversation</p>
-                  <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-                    <p className="text-yellow-300 flex items-center justify-center">
+                  <p className="text-sm text-gray-500">Click "New Turn" to begin the conversation</p>
+                  <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                    <p className="text-blue-300 flex items-center justify-center">
                       <AlertTriangle className="w-4 h-4 mr-2" />
-                      User must start the conversation first
+                      Click "New Turn" to start the conversation
                     </p>
                   </div>
                 </div>
@@ -983,14 +1041,14 @@ const ToolTrainer = () => {
           )}
         </div>
 
-        {/* Bottom Action Buttons - Horizontal Layout */}
+        {/* INLINE ACTION BUTTONS - All buttons in one horizontal row */}
         <div className="border-t border-gray-700/50 bg-gradient-to-r from-gray-800/90 to-gray-700/90 backdrop-blur p-4 shadow-lg">
-          <div className="flex items-center justify-center gap-4">
-            {/* New Turn Button */}
+          <div className="flex items-center justify-center gap-3 flex-wrap">
+            {/* New Turn Button - Primary action */}
             <Button 
               onClick={addNewTurn}
               disabled={!canStartNewTurn()}
-              className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white disabled:opacity-50 shadow-lg transition-all duration-200 px-6 h-12"
+              className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white disabled:opacity-50 shadow-lg transition-all duration-200 px-6 h-11"
             >
               <Plus className="w-4 h-4 mr-2" />
               New Turn
@@ -1001,7 +1059,7 @@ const ToolTrainer = () => {
               onClick={showTextChunkEditor}
               disabled={!canAddTextChunk() || showTextChunkInput}
               variant="outline"
-              className="bg-gray-700/80 border-gray-600/50 text-white hover:bg-gray-600/80 hover:border-blue-400/50 disabled:opacity-50 shadow-lg transition-all duration-200 px-6 h-12"
+              className="bg-gray-700/80 border-gray-600/50 text-white hover:bg-gray-600/80 hover:border-blue-400/50 disabled:opacity-50 shadow-lg transition-all duration-200 px-6 h-11"
             >
               <FileText className="w-4 h-4 mr-2" />
               Add Text Chunk
@@ -1013,19 +1071,19 @@ const ToolTrainer = () => {
                 onClick={addToolCall}
                 disabled={!canAddToolCall()}
                 variant="outline"
-                className="bg-green-500/20 border-green-400/50 text-green-300 hover:bg-green-500/30 hover:border-green-400 disabled:opacity-50 shadow-lg transition-all duration-200 px-6 h-12"
+                className="bg-green-500/20 border-green-400/50 text-green-300 hover:bg-green-500/30 hover:border-green-400 disabled:opacity-50 shadow-lg transition-all duration-200 px-6 h-11"
               >
                 <Settings className="w-4 h-4 mr-2" />
                 Add Tool Call
               </Button>
             )}
 
-            {/* Get All Results Button */}
+            {/* Get All Results Button - Show when tool calls are executable */}
             {canExecuteAllToolCalls() && (
               <Button 
                 onClick={executeAllToolCalls}
                 disabled={executeToolMutation.isPending}
-                className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white shadow-lg transition-all duration-200 px-6 h-12"
+                className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white shadow-lg transition-all duration-200 px-6 h-11"
               >
                 {executeToolMutation.isPending ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -1041,7 +1099,7 @@ const ToolTrainer = () => {
               onClick={goBackStep}
               disabled={!canGoBackStep()}
               variant="outline" 
-              className="bg-gray-700/80 border-gray-600/50 text-white hover:bg-gray-600/80 hover:border-blue-400/50 disabled:opacity-50 shadow-lg transition-all duration-200 px-6 h-12"
+              className="bg-gray-700/80 border-gray-600/50 text-white hover:bg-gray-600/80 hover:border-blue-400/50 disabled:opacity-50 shadow-lg transition-all duration-200 px-6 h-11"
             >
               <Undo className="w-4 h-4 mr-2" />
               Back Step
@@ -1051,13 +1109,13 @@ const ToolTrainer = () => {
             <Button 
               onClick={goBack}
               variant="outline" 
-              className="bg-gray-700/80 border-gray-600/50 text-white hover:bg-gray-600/80 hover:border-blue-400/50 shadow-lg transition-all duration-200 px-6 h-12"
+              className="bg-gray-700/80 border-gray-600/50 text-white hover:bg-gray-600/80 hover:border-blue-400/50 shadow-lg transition-all duration-200 px-6 h-11"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back
             </Button>
 
-            {/* Save Trace Button */}
+            {/* Save Button - Using the existing SaveConversationDialog */}
             <SaveConversationDialog 
               messages={conversation.messages}
               exampleName={exampleName}
@@ -1068,10 +1126,10 @@ const ToolTrainer = () => {
           {/* Status messages */}
           <div className="text-sm text-center mt-4">
             {!conversationStarted && (
-              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 inline-block">
-                <p className="text-yellow-300 flex items-center justify-center">
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 inline-block">
+                <p className="text-blue-300 flex items-center justify-center">
                   <AlertTriangle className="w-4 h-4 mr-2" />
-                  User must start the conversation first
+                  Click "New Turn" to start the conversation
                 </p>
               </div>
             )}
