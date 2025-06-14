@@ -33,7 +33,8 @@ import {
   Trash2,
   Zap,
   MessageSquare,
-  Clock
+  Clock,
+  Undo
 } from 'lucide-react';
 import { useTools, useExecuteToolResult } from '@/hooks/useApi';
 import { Tool, Message, ConversationState } from '@/types/toolTrainer';
@@ -162,6 +163,12 @@ const ToolTrainer = () => {
   const [showTextChunkInput, setShowTextChunkInput] = useState(false);
   const [conversationStarted, setConversationStarted] = useState(false);
 
+  const [conversationHistory, setConversationHistory] = useState<{
+    messages: Message[];
+    toolCalls: ToolCall[];
+    step: 'user' | 'assistant';
+  }[]>([]);
+
   const { data: tools, isLoading: toolsLoading, error: toolsError } = useTools();
   const executeToolMutation = useExecuteToolResult();
   const isConnected = !toolsError;
@@ -185,7 +192,22 @@ const ToolTrainer = () => {
     setTags(tags.filter(tag => tag !== tagToRemove));
   };
 
+  const saveCurrentState = () => {
+    // Save current state before making changes
+    setConversationHistory(prev => [
+      ...prev,
+      {
+        messages: [...conversation.messages],
+        toolCalls: [...toolCalls],
+        step: currentStep
+      }
+    ]);
+  };
+
   const addNewTurn = () => {
+    // Save current state before switching turns
+    saveCurrentState();
+    
     // Reset states for new turn
     setShowTextChunkInput(false);
     setMessageContent('');
@@ -370,6 +392,45 @@ const ToolTrainer = () => {
     setExampleName(savedConversation.name);
     setDescription(savedConversation.description || '');
     setConversationStarted(savedConversation.messages.length > 0);
+  };
+
+  const goBackStep = () => {
+    if (conversationHistory.length > 0) {
+      // Get the last saved state
+      const lastState = conversationHistory[conversationHistory.length - 1];
+      
+      // Restore the conversation to the previous state
+      setConversation(prev => ({
+        ...prev,
+        messages: lastState.messages
+      }));
+      setToolCalls(lastState.toolCalls);
+      setCurrentStep(lastState.step);
+      
+      // Remove this state from history
+      setConversationHistory(prev => prev.slice(0, -1));
+      
+      // Reset current turn states
+      setShowTextChunkInput(false);
+      setMessageContent('');
+      setHasAddedTextChunk(false);
+    } else {
+      // If no history, go back to initial state
+      setConversation(prev => ({
+        ...prev,
+        messages: []
+      }));
+      setToolCalls([]);
+      setCurrentStep('user');
+      setConversationStarted(false);
+      setShowTextChunkInput(false);
+      setMessageContent('');
+      setHasAddedTextChunk(false);
+    }
+  };
+
+  const canGoBackStep = () => {
+    return conversationHistory.length > 0 || conversation.messages.length > 0;
   };
 
   const goBack = () => {
@@ -939,6 +1000,17 @@ const ToolTrainer = () => {
                 Get All Results
               </Button>
             )}
+
+            {/* Back Step Button */}
+            <Button 
+              onClick={goBackStep}
+              disabled={!canGoBackStep()}
+              variant="outline" 
+              className="bg-gray-700/80 border-gray-600/50 text-white hover:bg-gray-600/80 hover:border-blue-400/50 disabled:opacity-50 shadow-lg transition-all duration-200 px-6 h-12"
+            >
+              <Undo className="w-4 h-4 mr-2" />
+              Back Step
+            </Button>
 
             {/* Back Button */}
             <Button 
