@@ -1,4 +1,3 @@
-
 interface SavedConversation {
   id: string;
   name: string;
@@ -22,7 +21,7 @@ interface PythonExecutionResponse {
 
 class ConversationService {
   private readonly STORAGE_KEY = 'saved-conversations';
-  private readonly API_BASE_URL = 'YOUR_BACKEND_API_URL'; // Replace with your actual API URL
+  private readonly API_BASE_URL = 'http://localhost:8000'; // Your backend API URL
 
   // Save conversation locally
   saveConversation(conversation: Omit<SavedConversation, 'id' | 'createdAt' | 'updatedAt'>): SavedConversation {
@@ -57,15 +56,15 @@ class ConversationService {
     localStorage.setItem(this.STORAGE_KEY, JSON.stringify(filtered));
   }
 
-  // Execute Python code via your backend API
+  // Execute Python code via your backend API - Updated to use new endpoint
   async executePythonCode(request: PythonExecutionRequest): Promise<PythonExecutionResponse> {
     try {
-      const response = await fetch(`${this.API_BASE_URL}/execute-python`, {
+      const response = await fetch(`${this.API_BASE_URL}/execute_tool_result`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(request)
+        body: JSON.stringify({ code: request.code })
       });
 
       if (!response.ok) {
@@ -73,7 +72,11 @@ class ConversationService {
       }
 
       const data = await response.json();
-      return data;
+      return {
+        status: 'success',
+        result: data.code_output,
+        executionTime: 0 // Backend doesn't provide execution time
+      };
     } catch (error) {
       console.error('Error executing Python code:', error);
       return {

@@ -1,12 +1,57 @@
 
 const API_BASE_URL = 'http://localhost:8000';
 
-export interface Tool {
-  name: string;
-  description: string;
-  functions: string[];
+export interface Param {
+  param_name: string;
+  param_type: string;
+  is_required: boolean;
+  default_value: string;
 }
 
+export interface Function {
+  func_name: string;
+  params: Param[];
+  return_value: Param;
+}
+
+export interface PythonClass {
+  class_name: string;
+  params: Param[];
+}
+
+export interface Tool {
+  tool_name: string;
+  functions: Function[];
+  classes: PythonClass[];
+}
+
+export interface CodeChunk {
+  chunk_id: number;
+  code: string;
+}
+
+export interface CodeChunkOutput {
+  chunk_id: number;
+  code_output: Record<string, any>;
+}
+
+export interface ExecuteToolRequest {
+  code: string;
+}
+
+export interface ExecuteToolResponse {
+  code_output: Record<string, any>;
+}
+
+export interface ExecuteAllToolsRequest {
+  code_chunks: CodeChunk[];
+}
+
+export interface ExecuteAllToolsResponse {
+  code_chunk_output: CodeChunkOutput[];
+}
+
+// Legacy interfaces for backward compatibility
 export interface ToolParameter {
   name: string;
   type: 'text' | 'number' | 'boolean';
@@ -66,10 +111,13 @@ export interface ApiResponse<T> {
 }
 
 class ApiService {
-  // A. Get Tools
+  // Get Tools - Updated to match your backend structure
   async getTools(): Promise<Tool[]> {
     try {
       const response = await fetch(`${API_BASE_URL}/tools`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       const data = await response.json();
       console.log('Tools data:', data);
       return data;
@@ -79,7 +127,47 @@ class ApiService {
     }
   }
 
-  // Get Tool Schema
+  // Execute Tool Result API
+  async executeToolResult(request: ExecuteToolRequest): Promise<ExecuteToolResponse> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/execute_tool_result`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request)
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      console.log('Tool execute response:', data);
+      return data;
+    } catch (error) {
+      console.error('Error executing tool:', error);
+      throw error;
+    }
+  }
+
+  // Execute All Tools API
+  async executeAllTools(request: ExecuteAllToolsRequest): Promise<ExecuteAllToolsResponse> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/execute_all_tools`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request)
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      console.log('Execute all tools response:', data);
+      return data;
+    } catch (error) {
+      console.error('Error executing all tools:', error);
+      throw error;
+    }
+  }
+
+  // Legacy methods for backward compatibility
   async getToolSchema(toolName: string): Promise<ToolSchema> {
     try {
       const response = await fetch(`${API_BASE_URL}/tools/${toolName}/schema`);
@@ -92,7 +180,6 @@ class ApiService {
     }
   }
 
-  // Execute Tool
   async executeTool(request: ToolExecuteRequest): Promise<ToolExecuteResponse> {
     try {
       const response = await fetch(`${API_BASE_URL}/tools/execute`, {
@@ -109,7 +196,6 @@ class ApiService {
     }
   }
 
-  // B. Create a New Example
   async createExample(example: CreateExampleRequest): Promise<ApiResponse<any>> {
     try {
       const response = await fetch(`${API_BASE_URL}/examples`, {
@@ -126,7 +212,6 @@ class ApiService {
     }
   }
 
-  // C. Get All Examples
   async getExamples(): Promise<Example[]> {
     try {
       const response = await fetch(`${API_BASE_URL}/examples`);
@@ -139,7 +224,6 @@ class ApiService {
     }
   }
 
-  // D. Update an Example
   async updateExample(exampleId: string, example: Partial<CreateExampleRequest>): Promise<ApiResponse<any>> {
     try {
       const response = await fetch(`${API_BASE_URL}/examples/${exampleId}`, {
@@ -156,7 +240,6 @@ class ApiService {
     }
   }
 
-  // Get specific example by ID
   async getExample(exampleId: string): Promise<Example> {
     try {
       const response = await fetch(`${API_BASE_URL}/examples/${exampleId}`);

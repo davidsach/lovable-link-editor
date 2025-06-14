@@ -22,8 +22,8 @@ import {
 import { Sidebar } from '@/components/ToolTrainer/Sidebar';
 import { MessageBuilder } from '@/components/ToolTrainer/MessageBuilder';
 import { ExampleHeader } from '@/components/ToolTrainer/ExampleHeader';
-import { useTools, useExamples, useCreateExample, useUpdateExample, useExecuteTool } from '@/hooks/useApi';
-import { CreateExampleRequest, Step } from '@/services/api';
+import { useTools, useExamples, useCreateExample, useUpdateExample, useExecuteToolResult, useExecuteAllTools } from '@/hooks/useApi';
+import { CreateExampleRequest, Step, Tool, CodeChunk } from '@/services/api';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { LoadingOverlay } from '@/components/ui/loading-overlay';
 import { ErrorDisplay } from '@/components/ui/error-display';
@@ -93,7 +93,8 @@ const ToolTrainer = () => {
   const { data: examples = [], isLoading: examplesLoading } = useExamples();
   const createExampleMutation = useCreateExample();
   const updateExampleMutation = useUpdateExample();
-  const executeToolMutation = useExecuteTool();
+  const executeToolResultMutation = useExecuteToolResult();
+  const executeAllToolsMutation = useExecuteAllTools();
 
   // Add new function to load saved conversation
   const loadSavedConversation = (conversation: SavedConversation) => {
@@ -154,29 +155,8 @@ const ToolTrainer = () => {
     };
   };
 
-  // Use tools from API or fallback to static data
-  const availableTools = tools.length > 0 ? tools : [
-    {
-      name: 'browser_tools',
-      description: 'Tools for web browsing and content extraction',
-      functions: ['browse', 'extract_content', 'screenshot']
-    },
-    {
-      name: 'codenav_api',
-      description: 'Tools for code navigation and analysis',
-      functions: ['code_search', 'find_definition', 'find_references']
-    },
-    {
-      name: 'str_replace_editor',
-      description: 'Tools for file editing and manipulation',
-      functions: ['show_file', 'edit_file', 'create_file']
-    },
-    {
-      name: 'bash',
-      description: 'Execute bash commands and scripts',
-      functions: ['execute_command']
-    }
-  ];
+  // Use tools from API
+  const availableTools = tools.length > 0 ? tools : [];
 
   // Enhanced validation functions
   const validateMessages = () => {
@@ -421,10 +401,9 @@ const ToolTrainer = () => {
     setExecutionTimeouts(prev => ({ ...prev, [toolId]: timeoutId }));
 
     try {
-      // Use your backend API instead of the default one
-      const result = await conversationService.executePythonCode({
-        code: toolCall.content,
-        language: 'python'
+      // Use the new backend API
+      const result = await executeToolResultMutation.mutateAsync({
+        code: toolCall.content
       });
 
       // Clear timeout
@@ -434,58 +413,32 @@ const ToolTrainer = () => {
         return rest;
       });
 
-      if (result.status === 'error') {
-        // Add error as tool result
-        setCurrentExample(prev => ({
-          ...prev,
-          messages: prev.messages.map(msg => ({
-            ...msg,
-            content: msg.content.map(content => 
-              content.tool_id === toolId
-                ? content
-                : content
-            ).concat(
-              msg.content.some(content => content.tool_id === toolId) 
-                ? [{ type: 'tool_result' as const, content: `Error: ${result.error}` }]
-                : []
-            )
-          }))
-        }));
+      const formattedResult = typeof result.code_output === 'object' 
+        ? JSON.stringify(result.code_output, null, 2)
+        : String(result.code_output);
 
-        addError({
-          message: result.error || 'Code execution failed',
-          type: 'error',
-          field: `execution-${toolId}`,
-          retryable: true
-        });
-      } else {
-        const formattedResult = typeof result.result === 'object' 
-          ? JSON.stringify(result.result, null, 2)
-          : String(result.result);
+      // Add tool result after the tool call
+      setCurrentExample(prev => ({
+        ...prev,
+        messages: prev.messages.map(msg => ({
+          ...msg,
+          content: msg.content.map(content => 
+            content.tool_id === toolId
+              ? content
+              : content
+          ).concat(
+            msg.content.some(content => content.tool_id === toolId) 
+              ? [{ type: 'tool_result' as const, content: formattedResult }]
+              : []
+          )
+        }))
+      }));
 
-        // Add tool result after the tool call
-        setCurrentExample(prev => ({
-          ...prev,
-          messages: prev.messages.map(msg => ({
-            ...msg,
-            content: msg.content.map(content => 
-              content.tool_id === toolId
-                ? content
-                : content
-            ).concat(
-              msg.content.some(content => content.tool_id === toolId) 
-                ? [{ type: 'tool_result' as const, content: formattedResult }]
-                : []
-            )
-          }))
-        }));
-
-        addError({
-          message: 'Code executed successfully',
-          type: 'info',
-          field: `execution-${toolId}`
-        });
-      }
+      addError({
+        message: 'Code executed successfully',
+        type: 'info',
+        field: `execution-${toolId}`
+      });
 
     } catch (error) {
       // Clear timeout
@@ -529,57 +482,47 @@ const ToolTrainer = () => {
     setIsLoading(true);
     
     // Collect all tool calls
-    const toolCalls: Array<{messageId: string, contentIndex: number, toolCall: any}> = [];
+    const codeChunks: CodeChunk[] = [];
+    let chunkId = 0;
     
     currentExample.messages.forEach(msg => {
-      msg.content.forEach((messageContent, index) => {
+      msg.content.forEach((messageContent) => {
         if (messageContent.type === 'tool_call' && messageContent.content.trim() && messageContent.tool_id) {
-          toolCalls.push({
-            messageId: msg.id,
-            contentIndex: index,
-            toolCall: messageContent
+          codeChunks.push({
+            chunk_id: chunkId++,
+            code: messageContent.content
           });
         }
       });
     });
 
-    try {
-      // Execute all tool calls (Python code)
-      const results = await Promise.all(
-        toolCalls.map(async ({ toolCall }) => {
-          try {
-            const result = await executeToolMutation.mutateAsync({
-              tool_name: 'python_executor',
-              parameters: {
-                code: toolCall.content,
-                language: 'python'
-              }
-            });
+    if (codeChunks.length === 0) {
+      setIsLoading(false);
+      addError({
+        message: 'No Python code to execute',
+        type: 'warning',
+        field: 'execution-all'
+      });
+      return;
+    }
 
-            return {
-              toolId: toolCall.tool_id,
-              result: typeof result.result === 'object' 
-                ? JSON.stringify(result.result, null, 2)
-                : String(result.result)
-            };
-          } catch (error) {
-            return {
-              toolId: toolCall.tool_id,
-              result: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
-            };
-          }
-        })
-      );
+    try {
+      // Execute all tool calls using the new API
+      const result = await executeAllToolsMutation.mutateAsync({
+        code_chunks: codeChunks
+      });
 
       // Update all tool results
+      let resultIndex = 0;
       setCurrentExample(prev => ({
         ...prev,
         messages: prev.messages.map(msg => ({
           ...msg,
           content: msg.content.map(messageContent => {
             if (messageContent.type === 'tool_call' && messageContent.tool_id) {
-              const result = results.find(r => r.toolId === messageContent.tool_id);
-              if (result) {
+              const chunkOutput = result.code_chunk_output[resultIndex];
+              if (chunkOutput) {
+                resultIndex++;
                 return messageContent;
               }
             }
@@ -588,19 +531,34 @@ const ToolTrainer = () => {
             // Add tool results after tool calls
             msg.content
               .filter(content => content.type === 'tool_call' && content.tool_id)
-              .map(content => {
-                const result = results.find(r => r.toolId === content.tool_id);
-                return result ? {
+              .map((content, index) => {
+                const chunkOutput = result.code_chunk_output[index];
+                return chunkOutput ? {
                   type: 'tool_result' as const,
-                  content: result.result
+                  content: typeof chunkOutput.code_output === 'object' 
+                    ? JSON.stringify(chunkOutput.code_output, null, 2)
+                    : String(chunkOutput.code_output)
                 } : null;
               })
               .filter(Boolean)
           )
         }))
       }));
+
+      addError({
+        message: `Successfully executed ${codeChunks.length} code chunks`,
+        type: 'info',
+        field: 'execution-all'
+      });
+
     } catch (error) {
       console.error('Failed to execute all Python code:', error);
+      addError({
+        message: 'Failed to execute all Python code',
+        type: 'error',
+        field: 'execution-all',
+        retryable: true
+      });
     }
     
     setIsLoading(false);

@@ -1,6 +1,16 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiService, Tool, Example, CreateExampleRequest, ToolSchema, ToolExecuteRequest } from '../services/api';
+import { 
+  apiService, 
+  Tool, 
+  Example, 
+  CreateExampleRequest, 
+  ToolSchema, 
+  ToolExecuteRequest,
+  ExecuteToolRequest,
+  ExecuteAllToolsRequest,
+  CodeChunk 
+} from '../services/api';
 import { useToast } from './use-toast';
 
 export const useTools = () => {
@@ -31,6 +41,38 @@ export const useExecuteTool = () => {
         variant: 'destructive',
       });
       console.error('Execute tool error:', error);
+    },
+  });
+};
+
+export const useExecuteToolResult = () => {
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (request: ExecuteToolRequest) => apiService.executeToolResult(request),
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: 'Failed to execute Python code',
+        variant: 'destructive',
+      });
+      console.error('Execute tool result error:', error);
+    },
+  });
+};
+
+export const useExecuteAllTools = () => {
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (request: ExecuteAllToolsRequest) => apiService.executeAllTools(request),
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: 'Failed to execute all Python code',
+        variant: 'destructive',
+      });
+      console.error('Execute all tools error:', error);
     },
   });
 };
