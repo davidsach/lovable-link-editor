@@ -1,4 +1,9 @@
 
+/**
+ * React Query Hooks for API Operations
+ * Custom hooks for data fetching and mutations with error handling
+ */
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   toolsApi,
@@ -10,161 +15,306 @@ import {
 } from '../api';
 import { useToast } from './use-toast';
 
-// Tools hooks
+// =============================================================================
+// QUERY KEYS
+// =============================================================================
+
+/**
+ * Centralized query keys for React Query
+ */
+export const QUERY_KEYS = {
+  TOOLS: ['tools'] as const,
+  TOOL_SCHEMA: (toolName: string) => ['tool-schema', toolName] as const,
+  EXAMPLES: ['examples'] as const,
+  EXAMPLE: (id: string) => ['example', id] as const,
+} as const;
+
+// =============================================================================
+// TOOLS HOOKS
+// =============================================================================
+
+/**
+ * Hook to fetch all available tools
+ * @returns Query result with tools data
+ */
 export const useTools = () => {
   return useQuery({
-    queryKey: ['tools'],
+    queryKey: QUERY_KEYS.TOOLS,
     queryFn: () => toolsApi.getTools(),
     staleTime: 5 * 60 * 1000, // 5 minutes
-    retry: false, // Don't retry on connection failures
-    refetchOnWindowFocus: false, // Don't refetch when window gains focus
+    retry: (failureCount, error) => {
+      // Don't retry on connection failures
+      if (error instanceof Error && error.message.includes('Failed to connect')) {
+        return false;
+      }
+      return failureCount < 2;
+    },
+    refetchOnWindowFocus: false,
+    meta: {
+      errorMessage: 'Failed to load available tools'
+    }
   });
 };
 
+/**
+ * Hook to fetch tool schema for a specific tool
+ * @param toolName - Name of the tool to get schema for
+ * @returns Query result with tool schema
+ */
 export const useToolSchema = (toolName: string) => {
   return useQuery({
-    queryKey: ['tool-schema', toolName],
+    queryKey: QUERY_KEYS.TOOL_SCHEMA(toolName),
     queryFn: () => toolsApi.getToolSchema(toolName),
-    enabled: !!toolName,
+    enabled: !!toolName && toolName.trim() !== '',
     retry: false,
     refetchOnWindowFocus: false,
+    staleTime: 10 * 60 * 1000, // 10 minutes (schemas don't change often)
+    meta: {
+      errorMessage: `Failed to load schema for tool: ${toolName}`
+    }
   });
 };
 
+/**
+ * Hook to execute a tool
+ * @returns Mutation for tool execution
+ */
 export const useExecuteTool = () => {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: (request: ToolExecuteRequest) => toolsApi.executeTool(request),
-    onError: (error) => {
-      const errorMessage = error instanceof Error && error.message.includes('Failed to fetch')
+    mutationFn: (request: ToolExecuteRequest) => {
+      console.log('🔧 Executing tool via hook:', request.tool_name);
+      return toolsApi.executeTool(request);
+    },
+    onSuccess: (data, variables) => {
+      console.log('✅ Tool executed successfully:', variables.tool_name);
+      toast({
+        title: 'Tool Executed',
+        description: `${variables.tool_name} executed successfully`,
+      });
+    },
+    onError: (error, variables) => {
+      console.error('❌ Tool execution failed:', error);
+      
+      const errorMessage = error instanceof Error && error.message.includes('Failed to connect')
         ? 'Unable to connect to backend server. Please ensure your backend is running.'
-        : 'Failed to execute tool';
+        : `Failed to execute tool: ${variables.tool_name}`;
       
       toast({
-        title: 'Connection Error',
+        title: 'Tool Execution Failed',
         description: errorMessage,
         variant: 'destructive',
       });
-      console.error('Execute tool error:', error);
     },
   });
 };
 
+/**
+ * Hook to execute Python code
+ * @returns Mutation for Python code execution
+ */
 export const useExecuteToolResult = () => {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: (request: ExecuteToolRequest) => toolsApi.executeToolResult(request),
+    mutationFn: (request: ExecuteToolRequest) => {
+      console.log('🐍 Executing Python code via hook');
+      return toolsApi.executeToolResult(request);
+    },
+    onSuccess: (data) => {
+      console.log('✅ Python code executed successfully');
+      toast({
+        title: 'Code Executed',
+        description: 'Python code executed successfully',
+      });
+    },
     onError: (error) => {
-      const errorMessage = error instanceof Error && error.message.includes('Failed to fetch')
+      console.error('❌ Python code execution failed:', error);
+      
+      const errorMessage = error instanceof Error && error.message.includes('Failed to connect')
         ? 'Unable to connect to backend server. Please ensure your backend is running.'
         : 'Failed to execute Python code';
       
       toast({
-        title: 'Connection Error',
+        title: 'Code Execution Failed',
         description: errorMessage,
         variant: 'destructive',
       });
-      console.error('Execute tool result error:', error);
     },
   });
 };
 
+/**
+ * Hook to execute multiple Python code chunks
+ * @returns Mutation for multiple code execution
+ */
 export const useExecuteAllTools = () => {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: (request: ExecuteAllToolsRequest) => toolsApi.executeAllTools(request),
-    onError: (error) => {
-      const errorMessage = error instanceof Error && error.message.includes('Failed to fetch')
+    mutationFn: (request: ExecuteAllToolsRequest) => {
+      console.log('🐍 Executing multiple Python code chunks via hook');
+      return toolsApi.executeAllTools(request);
+    },
+    onSuccess: (data, variables) => {
+      console.log('✅ All Python code chunks executed successfully');
+      toast({
+        title: 'All Code Executed',
+        description: `Successfully executed ${variables.code_chunks.length} code chunks`,
+      });
+    },
+    onError: (error, variables) => {
+      console.error('❌ Multiple Python code execution failed:', error);
+      
+      const errorMessage = error instanceof Error && error.message.includes('Failed to connect')
         ? 'Unable to connect to backend server. Please ensure your backend is running.'
-        : 'Failed to execute all Python code';
+        : 'Failed to execute Python code chunks';
       
       toast({
-        title: 'Connection Error',
+        title: 'Code Execution Failed',
         description: errorMessage,
         variant: 'destructive',
       });
-      console.error('Execute all tools error:', error);
     },
   });
 };
 
-// Examples hooks
+// =============================================================================
+// EXAMPLES HOOKS
+// =============================================================================
+
+/**
+ * Hook to fetch all training examples
+ * @returns Query result with examples data
+ */
 export const useExamples = () => {
   return useQuery({
-    queryKey: ['examples'],
+    queryKey: QUERY_KEYS.EXAMPLES,
     queryFn: () => examplesApi.getExamples(),
     retry: false,
     refetchOnWindowFocus: false,
+    meta: {
+      errorMessage: 'Failed to load training examples'
+    }
   });
 };
 
+/**
+ * Hook to fetch a specific training example
+ * @param id - ID of the example to fetch
+ * @returns Query result with example data
+ */
 export const useExample = (id: string) => {
   return useQuery({
-    queryKey: ['example', id],
+    queryKey: QUERY_KEYS.EXAMPLE(id),
     queryFn: () => examplesApi.getExample(id),
-    enabled: !!id,
+    enabled: !!id && id.trim() !== '',
     retry: false,
     refetchOnWindowFocus: false,
+    meta: {
+      errorMessage: `Failed to load example: ${id}`
+    }
   });
 };
 
+/**
+ * Hook to create a new training example
+ * @returns Mutation for example creation
+ */
 export const useCreateExample = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: (example: CreateExampleRequest) => examplesApi.createExample(example),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['examples'] });
-      toast({
-        title: 'Success',
-        description: 'Example created successfully',
-      });
+    mutationFn: (example: CreateExampleRequest) => {
+      console.log('📝 Creating new training example:', example.name);
+      return examplesApi.createExample(example);
     },
-    onError: (error) => {
-      const errorMessage = error instanceof Error && error.message.includes('Failed to fetch')
-        ? 'Unable to connect to backend server. Please ensure your backend is running.'
-        : 'Failed to create example';
+    onSuccess: (data, variables) => {
+      console.log('✅ Training example created successfully:', variables.name);
+      
+      // Invalidate and refetch examples list
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.EXAMPLES });
       
       toast({
-        title: 'Connection Error',
+        title: 'Example Created',
+        description: `Training example "${variables.name}" created successfully`,
+      });
+    },
+    onError: (error, variables) => {
+      console.error('❌ Failed to create training example:', error);
+      
+      const errorMessage = error instanceof Error && error.message.includes('Failed to connect')
+        ? 'Unable to connect to backend server. Please ensure your backend is running.'
+        : 'Failed to create training example';
+      
+      toast({
+        title: 'Creation Failed',
         description: errorMessage,
         variant: 'destructive',
       });
-      console.error('Create example error:', error);
     },
   });
 };
 
+/**
+ * Hook to update an existing training example
+ * @returns Mutation for example update
+ */
 export const useUpdateExample = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: ({ exampleId, example }: { exampleId: string; example: Partial<CreateExampleRequest> }) => 
-      examplesApi.updateExample(exampleId, example),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['examples'] });
-      queryClient.invalidateQueries({ queryKey: ['example', variables.exampleId] });
-      toast({
-        title: 'Success',
-        description: 'Example updated successfully',
-      });
+    mutationFn: ({ exampleId, example }: { exampleId: string; example: Partial<CreateExampleRequest> }) => {
+      console.log('📝 Updating training example:', exampleId);
+      return examplesApi.updateExample(exampleId, example);
     },
-    onError: (error) => {
-      const errorMessage = error instanceof Error && error.message.includes('Failed to fetch')
-        ? 'Unable to connect to backend server. Please ensure your backend is running.'
-        : 'Failed to update example';
+    onSuccess: (data, variables) => {
+      console.log('✅ Training example updated successfully:', variables.exampleId);
+      
+      // Invalidate related queries
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.EXAMPLES });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.EXAMPLE(variables.exampleId) });
       
       toast({
-        title: 'Connection Error',
+        title: 'Example Updated',
+        description: 'Training example updated successfully',
+      });
+    },
+    onError: (error, variables) => {
+      console.error('❌ Failed to update training example:', error);
+      
+      const errorMessage = error instanceof Error && error.message.includes('Failed to connect')
+        ? 'Unable to connect to backend server. Please ensure your backend is running.'
+        : 'Failed to update training example';
+      
+      toast({
+        title: 'Update Failed',
         description: errorMessage,
         variant: 'destructive',
       });
-      console.error('Update example error:', error);
     },
+  });
+};
+
+// =============================================================================
+// UTILITY HOOKS
+// =============================================================================
+
+/**
+ * Hook to test backend connection
+ * @returns Query result with connection status
+ */
+export const useBackendConnection = () => {
+  return useQuery({
+    queryKey: ['backend-connection'],
+    queryFn: () => toolsApi.testConnection(),
+    refetchInterval: 30000, // Check every 30 seconds
+    retry: false,
+    meta: {
+      errorMessage: 'Backend connection test failed'
+    }
   });
 };
