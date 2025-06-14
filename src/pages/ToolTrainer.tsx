@@ -32,6 +32,44 @@ import { useErrorHandler } from '@/hooks/useErrorHandler';
 import { useToast } from '@/hooks/use-toast';
 import { Tool, ToolCall, Message, ConversationState } from '@/types/toolTrainer';
 
+// Mock tools for when backend is not available
+const mockTools: Tool[] = [
+  {
+    tool_name: 'calculator',
+    description: 'A basic calculator tool',
+    functions: [
+      {
+        func_name: 'calculate',
+        params: [
+          {
+            param_name: 'expression',
+            param_type: 'string',
+            is_required: true,
+            default_value: ''
+          }
+        ]
+      }
+    ]
+  },
+  {
+    tool_name: 'weather',
+    description: 'Get weather information',
+    functions: [
+      {
+        func_name: 'get_weather',
+        params: [
+          {
+            param_name: 'location',
+            param_type: 'string',
+            is_required: true,
+            default_value: ''
+          }
+        ]
+      }
+    ]
+  }
+];
+
 const ToolTrainer = () => {
   const [conversation, setConversation] = useState<ConversationState>({
     id: '',
@@ -54,6 +92,7 @@ const ToolTrainer = () => {
   const { toast } = useToast();
 
   const isConnected = !toolsError;
+  const availableTools = tools || mockTools;
 
   const handleRetryConnection = () => {
     refetchTools();
@@ -73,7 +112,7 @@ const ToolTrainer = () => {
   };
 
   const addToolCall = () => {
-    if (!tools || tools.length === 0) {
+    if (!availableTools || availableTools.length === 0) {
       toast({
         title: 'No Tools Available',
         description: 'Please ensure your backend is running and tools are available.',
@@ -84,7 +123,7 @@ const ToolTrainer = () => {
 
     const newToolCall: ToolCall = {
       id: `tool_${Date.now()}`,
-      toolName: tools[0].tool_name || tools[0].name,
+      toolName: availableTools[0].tool_name,
       parameters: {},
       result: null,
       status: 'pending',
@@ -130,11 +169,26 @@ const ToolTrainer = () => {
 
   const executeToolCall = async (toolCall: ToolCall) => {
     if (!isConnected) {
-      toast({
-        title: 'Backend Disconnected',
-        description: 'Cannot execute tools without backend connection.',
-        variant: 'destructive',
-      });
+      // Simulate execution with mock data
+      setIsExecuting(true);
+      updateToolCall(toolCall.id, { status: 'executing' });
+
+      setTimeout(() => {
+        updateToolCall(toolCall.id, {
+          result: { 
+            status: 'success',
+            message: `Mock execution of ${toolCall.toolName}`,
+            parameters: toolCall.parameters
+          },
+          status: 'completed'
+        });
+        setIsExecuting(false);
+        
+        toast({
+          title: 'Tool Executed (Mock)',
+          description: `Successfully executed ${toolCall.toolName} with mock data`,
+        });
+      }, 1000);
       return;
     }
 
@@ -173,20 +227,38 @@ const ToolTrainer = () => {
   };
 
   const executeAllToolCalls = async () => {
-    if (!isConnected) {
-      toast({
-        title: 'Backend Disconnected',
-        description: 'Cannot execute tools without backend connection.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
     const pendingToolCalls = conversation.toolCalls.filter(call => call.status === 'pending');
     if (pendingToolCalls.length === 0) {
       toast({
         title: 'No Pending Tools',
         description: 'All tools have already been executed or there are no tools to execute.',
+      });
+      return;
+    }
+
+    if (!isConnected) {
+      // Simulate execution with mock data
+      setIsExecuting(true);
+      
+      pendingToolCalls.forEach((call, index) => {
+        setTimeout(() => {
+          updateToolCall(call.id, {
+            result: { 
+              status: 'success',
+              message: `Mock execution of ${call.toolName}`,
+              parameters: call.parameters
+            },
+            status: 'completed'
+          });
+          
+          if (index === pendingToolCalls.length - 1) {
+            setIsExecuting(false);
+            toast({
+              title: 'Tools Executed (Mock)',
+              description: `Successfully executed ${pendingToolCalls.length} tools with mock data`,
+            });
+          }
+        }, 500 * (index + 1));
       });
       return;
     }
@@ -292,7 +364,7 @@ const ToolTrainer = () => {
   );
 
   const renderToolCall = (toolCall: ToolCall) => {
-    const tool = tools?.find(t => (t.tool_name || t.name) === toolCall.toolName);
+    const tool = availableTools?.find(t => t.tool_name === toolCall.toolName);
     
     return (
       <Card key={toolCall.id} className="mb-4">
@@ -316,7 +388,7 @@ const ToolTrainer = () => {
                 variant="ghost"
                 size="sm"
                 onClick={() => executeToolCall(toolCall)}
-                disabled={isExecuting || !isConnected}
+                disabled={isExecuting}
                 className="h-6 w-6 p-0"
               >
                 <Play className="w-3 h-3" />
@@ -343,9 +415,9 @@ const ToolTrainer = () => {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {tools?.map(tool => (
-                  <SelectItem key={tool.tool_name || tool.name} value={tool.tool_name || tool.name}>
-                    {tool.tool_name || tool.name}
+                {availableTools?.map(tool => (
+                  <SelectItem key={tool.tool_name} value={tool.tool_name}>
+                    {tool.tool_name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -429,7 +501,7 @@ const ToolTrainer = () => {
                       variant="outline"
                       size="sm"
                       onClick={executeAllToolCalls}
-                      disabled={isExecuting || !isConnected}
+                      disabled={isExecuting}
                     >
                       {isExecuting ? (
                         <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
@@ -489,7 +561,7 @@ const ToolTrainer = () => {
                         <Button 
                           onClick={addToolCall} 
                           size="sm"
-                          disabled={!isConnected || !tools || tools.length === 0}
+                          disabled={!availableTools || availableTools.length === 0}
                         >
                           <Plus className="w-4 h-4 mr-2" />
                           Add Tool Call
@@ -526,20 +598,30 @@ const ToolTrainer = () => {
                     <p className="text-sm text-gray-600">Loading tools...</p>
                   </div>
                 ) : !isConnected ? (
-                  <div className="text-center py-4">
+                  <div className="space-y-4">
                     <Alert>
                       <AlertDescription>
                         Backend disconnected. Using mock data for development.
                       </AlertDescription>
                     </Alert>
+                    <div className="space-y-2">
+                      {mockTools.map(tool => (
+                        <div key={tool.tool_name} className="p-3 border rounded-lg">
+                          <div className="font-medium text-sm">{tool.tool_name}</div>
+                          <div className="text-xs text-gray-600 mt-1">
+                            {tool.description || 'Mock tool for development'}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                ) : tools && tools.length > 0 ? (
+                ) : availableTools && availableTools.length > 0 ? (
                   <div className="space-y-2">
-                    {tools.map(tool => (
-                      <div key={tool.tool_name || tool.name} className="p-3 border rounded-lg">
-                        <div className="font-medium text-sm">{tool.tool_name || tool.name}</div>
+                    {availableTools.map(tool => (
+                      <div key={tool.tool_name} className="p-3 border rounded-lg">
+                        <div className="font-medium text-sm">{tool.tool_name}</div>
                         <div className="text-xs text-gray-600 mt-1">
-                          {tool.functions?.[0]?.func_name || 'No description available'}
+                          {tool.functions?.[0]?.func_name || tool.description || 'No description available'}
                         </div>
                       </div>
                     ))}

@@ -25,8 +25,18 @@ export interface ConversationState {
 }
 
 export interface Tool {
-  name: string;
-  description: string;
+  tool_name: string;
+  name?: string;
+  description?: string;
+  functions?: Array<{
+    func_name: string;
+    params: Array<{
+      param_name: string;
+      param_type: string;
+      is_required: boolean;
+      default_value: string;
+    }>;
+  }>;
 }
 
 export interface TrainingExample {
