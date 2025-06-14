@@ -32,6 +32,7 @@ import { Tool, CreateExampleRequest, Step } from '@/services/api';
 import { Message, TrainingExample } from '@/types/toolTrainer';
 import { NavigationHeader } from '@/components/ToolTrainer/NavigationHeader';
 import { ExampleHeader } from '@/components/ToolTrainer/ExampleHeader';
+import { ConnectionStatus } from '@/components/ui/connection-status';
 
 // Mock tools data for when API fails
 const mockTools: Tool[] = [
@@ -194,7 +195,7 @@ const ToolTrainer = () => {
   });
 
   // Hooks
-  const { data: tools = [], isLoading: toolsLoading } = useTools();
+  const { data: tools = [], isLoading: toolsLoading, error: toolsError, refetch: refetchTools } = useTools();
   const { errors, hasErrors, addError, clearErrors } = useErrorHandler();
   const createExampleMutation = useCreateExample();
   const updateExampleMutation = useUpdateExample();
@@ -202,6 +203,7 @@ const ToolTrainer = () => {
 
   // Use mock tools if API fails
   const availableTools = tools.length > 0 ? tools : mockTools;
+  const isBackendConnected = tools.length > 0 && !toolsError;
 
   // Helper functions
   const saveToHistory = () => {
@@ -547,6 +549,13 @@ const ToolTrainer = () => {
           
           {!sidebarCollapsed && (
             <div className="p-4 space-y-4 overflow-y-auto h-full pb-20">
+              {/* Connection Status */}
+              <ConnectionStatus
+                isConnected={isBackendConnected}
+                isLoading={toolsLoading}
+                onRetry={() => refetchTools()}
+              />
+              
               {availableTools.length > 0 ? (
                 availableTools.map((tool, index) => (
                   <Card key={index} className="border border-gray-200">
@@ -709,7 +718,7 @@ const ToolTrainer = () => {
                                       ...prev,
                                       messages: prev.messages.map(msg => 
                                         msg.id === message.id ? updatedMessage : msg
-                                      )
+                                      ))
                                     }));
                                   }}
                                   className="h-6 w-6 p-0 text-gray-400 hover:text-red-500"
@@ -734,7 +743,7 @@ const ToolTrainer = () => {
                                     ...prev,
                                     messages: prev.messages.map(msg => 
                                       msg.id === message.id ? updatedMessage : msg
-                                    )
+                                    ))
                                   }));
                                 }}
                                 placeholder="Enter message content..."
@@ -759,7 +768,7 @@ const ToolTrainer = () => {
                                       ...prev,
                                       messages: prev.messages.map(msg => 
                                         msg.id === message.id ? updatedMessage : msg
-                                      )
+                                      ))
                                     }));
                                   }}
                                   placeholder="# Write your Python code here..."

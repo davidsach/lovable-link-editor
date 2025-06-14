@@ -16,6 +16,8 @@ export const useTools = () => {
     queryKey: ['tools'],
     queryFn: () => toolsApi.getTools(),
     staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: false, // Don't retry on connection failures
+    refetchOnWindowFocus: false, // Don't refetch when window gains focus
   });
 };
 
@@ -24,6 +26,8 @@ export const useToolSchema = (toolName: string) => {
     queryKey: ['tool-schema', toolName],
     queryFn: () => toolsApi.getToolSchema(toolName),
     enabled: !!toolName,
+    retry: false,
+    refetchOnWindowFocus: false,
   });
 };
 
@@ -33,9 +37,13 @@ export const useExecuteTool = () => {
   return useMutation({
     mutationFn: (request: ToolExecuteRequest) => toolsApi.executeTool(request),
     onError: (error) => {
+      const errorMessage = error instanceof Error && error.message.includes('Failed to fetch')
+        ? 'Unable to connect to backend server. Please ensure your backend is running.'
+        : 'Failed to execute tool';
+      
       toast({
-        title: 'Error',
-        description: 'Failed to execute tool',
+        title: 'Connection Error',
+        description: errorMessage,
         variant: 'destructive',
       });
       console.error('Execute tool error:', error);
@@ -49,9 +57,13 @@ export const useExecuteToolResult = () => {
   return useMutation({
     mutationFn: (request: ExecuteToolRequest) => toolsApi.executeToolResult(request),
     onError: (error) => {
+      const errorMessage = error instanceof Error && error.message.includes('Failed to fetch')
+        ? 'Unable to connect to backend server. Please ensure your backend is running.'
+        : 'Failed to execute Python code';
+      
       toast({
-        title: 'Error',
-        description: 'Failed to execute Python code',
+        title: 'Connection Error',
+        description: errorMessage,
         variant: 'destructive',
       });
       console.error('Execute tool result error:', error);
@@ -65,9 +77,13 @@ export const useExecuteAllTools = () => {
   return useMutation({
     mutationFn: (request: ExecuteAllToolsRequest) => toolsApi.executeAllTools(request),
     onError: (error) => {
+      const errorMessage = error instanceof Error && error.message.includes('Failed to fetch')
+        ? 'Unable to connect to backend server. Please ensure your backend is running.'
+        : 'Failed to execute all Python code';
+      
       toast({
-        title: 'Error',
-        description: 'Failed to execute all Python code',
+        title: 'Connection Error',
+        description: errorMessage,
         variant: 'destructive',
       });
       console.error('Execute all tools error:', error);
@@ -80,6 +96,8 @@ export const useExamples = () => {
   return useQuery({
     queryKey: ['examples'],
     queryFn: () => examplesApi.getExamples(),
+    retry: false,
+    refetchOnWindowFocus: false,
   });
 };
 
@@ -88,6 +106,8 @@ export const useExample = (id: string) => {
     queryKey: ['example', id],
     queryFn: () => examplesApi.getExample(id),
     enabled: !!id,
+    retry: false,
+    refetchOnWindowFocus: false,
   });
 };
 
@@ -105,9 +125,13 @@ export const useCreateExample = () => {
       });
     },
     onError: (error) => {
+      const errorMessage = error instanceof Error && error.message.includes('Failed to fetch')
+        ? 'Unable to connect to backend server. Please ensure your backend is running.'
+        : 'Failed to create example';
+      
       toast({
-        title: 'Error',
-        description: 'Failed to create example',
+        title: 'Connection Error',
+        description: errorMessage,
         variant: 'destructive',
       });
       console.error('Create example error:', error);
@@ -131,9 +155,13 @@ export const useUpdateExample = () => {
       });
     },
     onError: (error) => {
+      const errorMessage = error instanceof Error && error.message.includes('Failed to fetch')
+        ? 'Unable to connect to backend server. Please ensure your backend is running.'
+        : 'Failed to update example';
+      
       toast({
-        title: 'Error',
-        description: 'Failed to update example',
+        title: 'Connection Error',
+        description: errorMessage,
         variant: 'destructive',
       });
       console.error('Update example error:', error);
