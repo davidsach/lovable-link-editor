@@ -226,6 +226,15 @@ const ToolTrainer = () => {
   };
 
   const addToolCall = () => {
+    // Check if there's already an incomplete tool call
+    const hasIncompleteToolCall = toolCalls.some(tc => 
+      !tc.toolName || !tc.pythonCode.trim() || tc.status === 'pending'
+    );
+    
+    if (hasIncompleteToolCall) {
+      return; // Don't add a new tool call if there's already an incomplete one
+    }
+    
     const newToolCall: ToolCall = {
       id: `tool_${Date.now()}`,
       toolName: '',
@@ -315,7 +324,14 @@ const ToolTrainer = () => {
 
   // Check if assistant can add tool call
   const canAddToolCall = () => {
-    return currentStep === 'assistant';
+    if (currentStep !== 'assistant') return false;
+    
+    // Check if there's already an incomplete tool call
+    const hasIncompleteToolCall = toolCalls.some(tc => 
+      !tc.toolName || !tc.pythonCode.trim() || tc.status === 'pending'
+    );
+    
+    return !hasIncompleteToolCall;
   };
 
   const getExecutableToolCallsCount = () => {
@@ -747,8 +763,8 @@ const ToolTrainer = () => {
                 </div>
               )}
 
-              {/* Tool Call Editors */}
-              {currentStep === 'assistant' && toolCalls.length > 0 && !showTextChunkInput && (
+              {/* Tool Call Editors - Show immediately when there are tool calls */}
+              {currentStep === 'assistant' && toolCalls.length > 0 && (
                 <ScrollArea className="flex-1 bg-gradient-to-r from-gray-800/90 to-gray-700/90 backdrop-blur p-6 shadow-lg">
                   <div className="space-y-6">
                     <div className="flex items-center justify-between">
