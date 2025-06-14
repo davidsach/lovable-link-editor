@@ -25,7 +25,9 @@ import {
   Calendar,
   BookOpen,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Bot,
+  Settings
 } from 'lucide-react';
 import { useTools } from '@/hooks/useApi';
 import { Tool, Message, ConversationState } from '@/types/toolTrainer';
@@ -120,6 +122,14 @@ const mockTools: Tool[] = [
   }
 ];
 
+interface ToolCall {
+  id: string;
+  toolName: string;
+  parameters: Record<string, any>;
+  result: string;
+  isExecuted: boolean;
+}
+
 const ToolTrainer = () => {
   const [conversation, setConversation] = useState<ConversationState>({
     id: '1',
@@ -135,10 +145,11 @@ const ToolTrainer = () => {
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
   const [expandedTools, setExpandedTools] = useState<Record<string, boolean>>({});
-  const [currentStep, setCurrentStep] = useState<'user' | 'assistant' | 'tool'>('user');
+  const [currentStep, setCurrentStep] = useState<'user' | 'assistant'>('user');
+  const [showTextChunk, setShowTextChunk] = useState(false);
+  const [showToolCall, setShowToolCall] = useState(false);
   const [messageContent, setMessageContent] = useState('');
-  const [selectedTool, setSelectedTool] = useState('');
-  const [toolParameters, setToolParameters] = useState('{}');
+  const [toolCalls, setToolCalls] = useState<ToolCall[]>([]);
   const [currentExampleId, setCurrentExampleId] = useState(1);
 
   const { data: tools, isLoading: toolsLoading, error: toolsError } = useTools();
@@ -164,15 +175,20 @@ const ToolTrainer = () => {
   };
 
   const addNewTurn = () => {
-    setCurrentStep('user');
+    // Reset all states for new turn
+    setShowTextChunk(false);
+    setShowToolCall(false);
     setMessageContent('');
+    
+    // Switch to the opposite role
+    setCurrentStep(currentStep === 'user' ? 'assistant' : 'user');
   };
 
   const addTextChunk = () => {
     if (messageContent.trim()) {
       const newMessage: Message = {
         id: `msg_${Date.now()}`,
-        role: currentStep === 'user' ? 'user' : 'assistant',
+        role: currentStep,
         content: messageContent,
         timestamp: new Date()
       };
@@ -183,18 +199,39 @@ const ToolTrainer = () => {
       }));
       
       setMessageContent('');
-      setCurrentStep(currentStep === 'user' ? 'assistant' : 'user');
+      setShowTextChunk(false);
     }
   };
 
-  const addPythonCode = () => {
-    // This would add a Python code block
-    console.log('Add Python Code clicked');
+  const addToolCall = () => {
+    const newToolCall: ToolCall = {
+      id: `tool_${Date.now()}`,
+      toolName: '',
+      parameters: {},
+      result: '',
+      isExecuted: false
+    };
+    
+    setToolCalls([...toolCalls, newToolCall]);
+    setShowToolCall(true);
   };
 
-  const executeAllCode = () => {
-    // This would execute all code
-    console.log('Execute All Code clicked');
+  const updateToolCall = (index: number, updates: Partial<ToolCall>) => {
+    setToolCalls(prev => prev.map((tc, i) => i === index ? { ...tc, ...updates } : tc));
+  };
+
+  const executeToolCall = (index: number) => {
+    const toolCall = toolCalls[index];
+    // Mock execution
+    const mockResult = `Tool ${toolCall.toolName} executed with parameters: ${JSON.stringify(toolCall.parameters)}`;
+    updateToolCall(index, { result: mockResult, isExecuted: true });
+  };
+
+  const removeToolCall = (index: number) => {
+    setToolCalls(prev => prev.filter((_, i) => i !== index));
+    if (toolCalls.length === 1) {
+      setShowToolCall(false);
+    }
   };
 
   const navigatePrevious = () => {
@@ -205,6 +242,20 @@ const ToolTrainer = () => {
 
   const navigateNext = () => {
     setCurrentExampleId(currentExampleId + 1);
+  };
+
+  const canAddToolCall = () => {
+    return currentStep === 'assistant' && (toolCalls.length === 0 || toolCalls.every(tc => tc.isExecuted));
+  };
+
+  const hasValidationErrors = () => {
+    if (currentStep === 'user') {
+      return !messageContent.trim() && showTextChunk;
+    } else {
+      if (showTextChunk && !messageContent.trim()) return true;
+      if (showToolCall && toolCalls.some(tc => !tc.toolName || !tc.result)) return true;
+    }
+    return false;
   };
 
   return (
@@ -406,48 +457,187 @@ const ToolTrainer = () => {
         {/* Main Content Area */}
         <div className="flex-1 p-6">
           {/* Current Step Display */}
-          <div className="mb-6 p-4 bg-gray-800 rounded-lg border border-red-500">
+          <div className="mb-6 p-4 bg-gray-800 rounded-lg border border-gray-600">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <User className="w-5 h-5 text-blue-400" />
+                {currentStep === 'user' ? (
+                  <User className="w-5 h-5 text-blue-400" />
+                ) : (
+                  <Bot className="w-5 h-5 text-green-400" />
+                )}
                 <span className="font-medium text-white capitalize">{currentStep}</span>
                 <Badge variant="outline" className="bg-blue-600 text-white border-blue-500">
-                  First
+                  Current
                 </Badge>
-                <Badge variant="destructive" className="bg-red-600 text-white">
-                  <AlertTriangle className="w-3 h-3 mr-1" />
-                  1 Error
-                </Badge>
+                {hasValidationErrors() && (
+                  <Badge variant="destructive" className="bg-red-600 text-white">
+                    <AlertTriangle className="w-3 h-3 mr-1" />
+                    Validation Error
+                  </Badge>
+                )}
               </div>
               <Badge variant="outline" className="border-gray-500 text-gray-300">
-                0 chunks
+                {showTextChunk || toolCalls.length > 0 ? 'Active' : 'Waiting for input'}
               </Badge>
             </div>
-            
-            <div className="mb-3">
-              <Alert variant="destructive" className="bg-red-900/20 border-red-500">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription className="text-red-400">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="destructive" className="text-xs">
-                      ERROR
-                    </Badge>
-                    <span>message-validation</span>
-                  </div>
-                  <div className="mt-1 text-red-300">
-                    User message must have text
-                  </div>
-                </AlertDescription>
-              </Alert>
-            </div>
 
-            <Textarea
-              value={messageContent}
-              onChange={(e) => setMessageContent(e.target.value)}
-              placeholder="Enter your message content..."
-              className="min-h-[100px] bg-gray-700 border-gray-600 text-white"
-            />
+            {/* Show buttons based on current step and state */}
+            {!showTextChunk && !showToolCall && (
+              <div className="mb-4 space-y-3">
+                <p className="text-gray-400 text-sm">Choose what to add to this {currentStep} turn:</p>
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={() => setShowTextChunk(true)}
+                    variant="outline"
+                    className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    Add Text Chunk
+                  </Button>
+                  
+                  {currentStep === 'assistant' && (
+                    <Button 
+                      onClick={addToolCall}
+                      disabled={!canAddToolCall()}
+                      variant="outline"
+                      className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 disabled:opacity-50"
+                    >
+                      <Settings className="w-4 h-4 mr-2" />
+                      Add Tool Call
+                    </Button>
+                  )}
+                </div>
+                {currentStep === 'assistant' && !canAddToolCall() && (
+                  <p className="text-red-400 text-xs">Complete previous tool call before adding another</p>
+                )}
+              </div>
+            )}
+
+            {/* Text Chunk Input */}
+            {showTextChunk && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-gray-300">Message Content</label>
+                  <Button 
+                    onClick={() => setShowTextChunk(false)}
+                    variant="ghost"
+                    size="sm"
+                    className="text-gray-400 hover:text-white"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+                <Textarea
+                  value={messageContent}
+                  onChange={(e) => setMessageContent(e.target.value)}
+                  placeholder="Enter your message content..."
+                  className="min-h-[100px] bg-gray-700 border-gray-600 text-white"
+                />
+                <Button 
+                  onClick={addTextChunk}
+                  disabled={!messageContent.trim()}
+                  className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Text Chunk
+                </Button>
+              </div>
+            )}
+
+            {/* Tool Calls */}
+            {showToolCall && toolCalls.map((toolCall, index) => (
+              <div key={toolCall.id} className="space-y-3 border-t border-gray-600 pt-3 mt-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-gray-300">Tool Call {index + 1}</label>
+                  <Button 
+                    onClick={() => removeToolCall(index)}
+                    variant="ghost"
+                    size="sm"
+                    className="text-red-400 hover:text-red-300"
+                  >
+                    Remove
+                  </Button>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <label className="text-xs text-gray-400">Tool Name</label>
+                    <Select 
+                      value={toolCall.toolName} 
+                      onValueChange={(value) => updateToolCall(index, { toolName: value })}
+                    >
+                      <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
+                        <SelectValue placeholder="Select tool..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableTools.map((tool) => (
+                          <SelectItem key={tool.tool_name} value={tool.tool_name}>
+                            {tool.tool_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label className="text-xs text-gray-400">Parameters (JSON)</label>
+                    <Input
+                      value={JSON.stringify(toolCall.parameters)}
+                      onChange={(e) => {
+                        try {
+                          const params = JSON.parse(e.target.value);
+                          updateToolCall(index, { parameters: params });
+                        } catch {}
+                      }}
+                      placeholder='{"param": "value"}'
+                      className="bg-gray-700 border-gray-600 text-white"
+                    />
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="text-xs text-gray-400">Tool Result</label>
+                  <Textarea
+                    value={toolCall.result}
+                    onChange={(e) => updateToolCall(index, { result: e.target.value })}
+                    placeholder="Tool result will appear here..."
+                    className="min-h-[80px] bg-gray-700 border-gray-600 text-white"
+                  />
+                </div>
+                
+                <Button 
+                  onClick={() => executeToolCall(index)}
+                  disabled={!toolCall.toolName || toolCall.isExecuted}
+                  className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
+                >
+                  <Play className="w-4 h-4 mr-2" />
+                  {toolCall.isExecuted ? 'Executed' : 'Execute Tool'}
+                </Button>
+              </div>
+            ))}
           </div>
+
+          {/* Conversation History */}
+          {conversation.messages.length > 0 && (
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-white mb-3">Conversation History</h3>
+              <div className="space-y-3">
+                {conversation.messages.map((message) => (
+                  <div key={message.id} className="p-3 bg-gray-800 rounded-lg border border-gray-600">
+                    <div className="flex items-center gap-2 mb-2">
+                      {message.role === 'user' ? (
+                        <User className="w-4 h-4 text-blue-400" />
+                      ) : (
+                        <Bot className="w-4 h-4 text-green-400" />
+                      )}
+                      <span className="font-medium text-white capitalize">{message.role}</span>
+                    </div>
+                    <p className="text-gray-300">{message.content}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Bottom Action Bar */}
           <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg border border-gray-700">
@@ -458,29 +648,6 @@ const ToolTrainer = () => {
               >
                 <Plus className="w-4 h-4 mr-2" />
                 New Turn
-              </Button>
-              <Button 
-                onClick={addTextChunk}
-                variant="outline"
-                className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
-              >
-                <FileText className="w-4 h-4 mr-2" />
-                Add Text Chunk
-              </Button>
-              <Button 
-                onClick={addPythonCode}
-                variant="outline"
-                className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
-              >
-                <Code className="w-4 h-4 mr-2" />
-                Add Python Code
-              </Button>
-              <Button 
-                onClick={executeAllCode}
-                className="bg-green-600 hover:bg-green-700 text-white"
-              >
-                <Play className="w-4 h-4 mr-2" />
-                Execute All Code
               </Button>
             </div>
 
