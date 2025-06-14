@@ -308,18 +308,25 @@ const ToolTrainer = () => {
 
   // Check if new turn can be started
   const canStartNewTurn = () => {
-    return conversationStarted && (
-      (currentStep === 'user' && hasAddedTextChunk) ||
-      (currentStep === 'assistant' && (hasAddedTextChunk || toolCalls.length > 0))
-    );
+    if (!conversationStarted) return false;
+    
+    if (currentStep === 'user') {
+      // User can start new turn if they have added a text chunk
+      return hasAddedTextChunk;
+    } else {
+      // Assistant can start new turn if they have added text chunk OR tool calls
+      return hasAddedTextChunk || toolCalls.length > 0;
+    }
   };
 
-  // Check if user can add text chunk (only once per turn for user)
+  // Check if user can add text chunk
   const canAddTextChunk = () => {
     if (currentStep === 'user') {
+      // User can only add one text chunk per turn
       return !hasAddedTextChunk;
     }
-    return true; // Assistant can add multiple times
+    // Assistant can add multiple text chunks
+    return true;
   };
 
   // Check if assistant can add tool call
@@ -1013,11 +1020,11 @@ const ToolTrainer = () => {
                   </p>
                 </div>
               )}
-              {currentStep === 'user' && !canAddTextChunk() && !hasAddedTextChunk && showTextChunkInput && (
+              {currentStep === 'user' && !canAddTextChunk() && !showTextChunkInput && (
                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
                   <p className="text-blue-300 flex items-center justify-center">
                     <MessageSquare className="w-4 h-4 mr-2" />
-                    User can add only one text chunk per turn
+                    User can add only one text chunk per turn. Click "New Turn" to continue.
                   </p>
                 </div>
               )}
