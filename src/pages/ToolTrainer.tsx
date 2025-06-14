@@ -46,6 +46,14 @@ const mockTools: Tool[] = [
           { param_name: "body", param_type: "str", is_required: true, default_value: "" }
         ],
         return_value: { param_name: "success", param_type: "bool", is_required: true, default_value: "True" }
+      },
+      {
+        func_name: "get_emails",
+        params: [
+          { param_name: "folder", param_type: "str", is_required: false, default_value: "inbox" },
+          { param_name: "limit", param_type: "int", is_required: false, default_value: "10" }
+        ],
+        return_value: { param_name: "emails", param_type: "list", is_required: true, default_value: "[]" }
       }
     ],
     classes: []
@@ -59,6 +67,15 @@ const mockTools: Tool[] = [
           { param_name: "name", param_type: "str", is_required: true, default_value: "" }
         ],
         return_value: { param_name: "contact", param_type: "dict", is_required: true, default_value: "{}" }
+      },
+      {
+        func_name: "add_contact",
+        params: [
+          { param_name: "name", param_type: "str", is_required: true, default_value: "" },
+          { param_name: "email", param_type: "str", is_required: true, default_value: "" },
+          { param_name: "phone", param_type: "str", is_required: false, default_value: "" }
+        ],
+        return_value: { param_name: "contact_id", param_type: "str", is_required: true, default_value: "" }
       }
     ],
     classes: []
@@ -73,6 +90,74 @@ const mockTools: Tool[] = [
           { param_name: "folder_id", param_type: "str", is_required: false, default_value: "" }
         ],
         return_value: { param_name: "file_id", param_type: "str", is_required: true, default_value: "" }
+      },
+      {
+        func_name: "download_file",
+        params: [
+          { param_name: "file_id", param_type: "str", is_required: true, default_value: "" }
+        ],
+        return_value: { param_name: "file_content", param_type: "bytes", is_required: true, default_value: "" }
+      },
+      {
+        func_name: "list_files",
+        params: [
+          { param_name: "folder_id", param_type: "str", is_required: false, default_value: "" }
+        ],
+        return_value: { param_name: "files", param_type: "list", is_required: true, default_value: "[]" }
+      }
+    ],
+    classes: []
+  },
+  {
+    tool_name: "calendar_api_tool",
+    functions: [
+      {
+        func_name: "create_event",
+        params: [
+          { param_name: "title", param_type: "str", is_required: true, default_value: "" },
+          { param_name: "start_time", param_type: "str", is_required: true, default_value: "" },
+          { param_name: "end_time", param_type: "str", is_required: true, default_value: "" },
+          { param_name: "description", param_type: "str", is_required: false, default_value: "" }
+        ],
+        return_value: { param_name: "event_id", param_type: "str", is_required: true, default_value: "" }
+      },
+      {
+        func_name: "get_events",
+        params: [
+          { param_name: "start_date", param_type: "str", is_required: false, default_value: "" },
+          { param_name: "end_date", param_type: "str", is_required: false, default_value: "" }
+        ],
+        return_value: { param_name: "events", param_type: "list", is_required: true, default_value: "[]" }
+      },
+      {
+        func_name: "delete_event",
+        params: [
+          { param_name: "event_id", param_type: "str", is_required: true, default_value: "" }
+        ],
+        return_value: { param_name: "success", param_type: "bool", is_required: true, default_value: "True" }
+      }
+    ],
+    classes: []
+  },
+  {
+    tool_name: "weather_tool",
+    functions: [
+      {
+        func_name: "get_current_weather",
+        params: [
+          { param_name: "location", param_type: "str", is_required: true, default_value: "" },
+          { param_name: "units", param_type: "str", is_required: false, default_value: "metric" }
+        ],
+        return_value: { param_name: "weather_data", param_type: "dict", is_required: true, default_value: "{}" }
+      },
+      {
+        func_name: "get_forecast",
+        params: [
+          { param_name: "location", param_type: "str", is_required: true, default_value: "" },
+          { param_name: "days", param_type: "int", is_required: false, default_value: "5" },
+          { param_name: "units", param_type: "str", is_required: false, default_value: "metric" }
+        ],
+        return_value: { param_name: "forecast_data", param_type: "dict", is_required: true, default_value: "{}" }
       }
     ],
     classes: []
