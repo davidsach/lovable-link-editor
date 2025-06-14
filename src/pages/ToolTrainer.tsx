@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,7 +13,6 @@ import {
   ChevronRight, 
   Wrench, 
   Code, 
-  BookOpen, 
   Plus, 
   Play, 
   ArrowLeft, 
@@ -24,42 +23,18 @@ import {
   Bot, 
   Loader2, 
   X, 
-  AlertTriangle,
-  HelpCircle,
-  ChevronUp,
-  ChevronDown
+  FileText, 
+  Calendar
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useTools, useCreateExample, useUpdateExample, useExecuteToolResult, useExecuteAllTools } from '@/hooks/useApi';
+import { useTools, useCreateExample, useUpdateExample, useExecuteToolResult } from '@/hooks/useApi';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
-import { validateExampleMetadata, validateMessageContent, validatePythonCode } from '@/utils/validation';
-import { Tool, CreateExampleRequest, Step, CodeChunk } from '@/services/api';
+import { Tool, CreateExampleRequest, Step } from '@/services/api';
+import { Message, TrainingExample } from '@/types/toolTrainer';
+import { NavigationHeader } from '@/components/ToolTrainer/NavigationHeader';
+import { ExampleHeader } from '@/components/ToolTrainer/ExampleHeader';
 
-// Types
-interface Message {
-  id: string;
-  role: 'user' | 'assistant';
-  content: Array<{
-    type: 'text' | 'tool_call' | 'tool_result';
-    content: string;
-    tool_name?: string;
-    tool_id?: string;
-  }>;
-}
-
-interface TrainingExample {
-  id: number;
-  name: string;
-  description: string;
-  messages: Message[];
-  metadata: {
-    created_at: string;
-    updated_at: string;
-    tags: string[];
-  };
-}
-
-// Mock tools data
+// Mock tools data for when API fails
 const mockTools: Tool[] = [
   {
     tool_name: "email_api_tool",
@@ -140,7 +115,6 @@ const ToolTrainer = () => {
   const createExampleMutation = useCreateExample();
   const updateExampleMutation = useUpdateExample();
   const executeToolResultMutation = useExecuteToolResult();
-  const executeAllToolsMutation = useExecuteAllTools();
 
   // Use mock tools if API fails
   const availableTools = tools.length > 0 ? tools : mockTools;
@@ -392,6 +366,54 @@ const ToolTrainer = () => {
     }
   };
 
+  // Handle file loading
+  const handleLoadExample = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target?.result as string);
+        setCurrentExample(data);
+      } catch (error) {
+        console.error('Error loading example:', error);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleAutoGenerate = () => {
+    // Auto-generate a sample conversation
+    const sampleExample: TrainingExample = {
+      id: currentExample.id,
+      name: 'Auto-generated Example',
+      description: 'Sample conversation with tool usage',
+      messages: [
+        {
+          id: 'msg_1',
+          role: 'user',
+          content: [{ type: 'text', content: 'Send an email to john@example.com with subject "Meeting" and body "Let\'s meet tomorrow"' }]
+        },
+        {
+          id: 'msg_2',
+          role: 'assistant',
+          content: [
+            { type: 'text', content: 'I\'ll help you send that email. Let me use the email tool.' },
+            { type: 'tool_call', content: 'send_email(to="john@example.com", subject="Meeting", body="Let\'s meet tomorrow")', tool_name: 'email_api_tool', tool_id: 'tool_1' },
+            { type: 'tool_result', content: '{"success": true, "message_id": "msg_12345"}' }
+          ]
+        }
+      ],
+      metadata: {
+        ...currentExample.metadata,
+        updated_at: new Date().toISOString()
+      }
+    };
+    
+    setCurrentExample(sampleExample);
+  };
+
   // Validation
   const canSubmit = validateMessages().length === 0 && currentExample.messages.length > 0;
   const lastMessage = currentExample.messages[currentExample.messages.length - 1];
@@ -480,76 +502,45 @@ const ToolTrainer = () => {
           <div className="flex-1 overflow-hidden">
             <ScrollArea className="h-full">
               <div className="p-6 max-w-6xl mx-auto pb-32">
-                {/* Header */}
-                <div className="mb-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-4">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          if (currentExample.id > 1) {
-                            setCurrentExample(prev => ({
-                              ...prev,
-                              id: prev.id - 1,
-                              name: `Example ${prev.id - 1}`,
-                              messages: []
-                            }));
-                          }
-                        }}
-                        disabled={currentExample.id <= 1}
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                      </Button>
-                      <h1 className="text-2xl font-bold text-gray-900">
-                        Tool Trainer - Example {currentExample.id}
-                      </h1>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setCurrentExample(prev => ({
-                            ...prev,
-                            id: prev.id + 1,
-                            name: `Example ${prev.id + 1}`,
-                            messages: []
-                          }));
-                        }}
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
+                {/* Navigation Header */}
+                <NavigationHeader
+                  currentExample={currentExample}
+                  onNavigatePrevious={() => {
+                    if (currentExample.id > 1) {
+                      setCurrentExample(prev => ({
+                        ...prev,
+                        id: prev.id - 1,
+                        name: `Example ${prev.id - 1}`,
+                        messages: []
+                      }));
+                    }
+                  }}
+                  onNavigateNext={() => {
+                    setCurrentExample(prev => ({
+                      ...prev,
+                      id: prev.id + 1,
+                      name: `Example ${prev.id + 1}`,
+                      messages: []
+                    }));
+                  }}
+                  onLoadConversation={(conversation) => {
+                    setCurrentExample({
+                      ...currentExample,
+                      name: conversation.name,
+                      description: conversation.description,
+                      messages: conversation.messages
+                    });
+                  }}
+                />
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Example Name
-                      </label>
-                      <Input
-                        value={currentExample.name}
-                        onChange={(e) => setCurrentExample(prev => ({
-                          ...prev,
-                          name: e.target.value
-                        }))}
-                        placeholder="Enter example name..."
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Description
-                      </label>
-                      <Input
-                        value={currentExample.description}
-                        onChange={(e) => setCurrentExample(prev => ({
-                          ...prev,
-                          description: e.target.value
-                        }))}
-                        placeholder="Enter example description..."
-                      />
-                    </div>
-                  </div>
-                </div>
+                {/* Example Header */}
+                <ExampleHeader
+                  example={currentExample}
+                  onExampleChange={setCurrentExample}
+                  onLoad={handleLoadExample}
+                  onAutoGenerate={handleAutoGenerate}
+                  isLoading={isLoading}
+                />
                 
                 <ErrorDisplay 
                   errors={errors}

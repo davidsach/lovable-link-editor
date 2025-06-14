@@ -18,6 +18,30 @@ export const useTools = () => {
   });
 };
 
+export const useToolSchema = (toolName: string) => {
+  return useQuery({
+    queryKey: ['tool-schema', toolName],
+    queryFn: () => apiService.getToolSchema(toolName),
+    enabled: !!toolName,
+  });
+};
+
+export const useExecuteTool = () => {
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (request: ToolExecuteRequest) => apiService.executeTool(request),
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: 'Failed to execute tool',
+        variant: 'destructive',
+      });
+      console.error('Execute tool error:', error);
+    },
+  });
+};
+
 export const useExecuteToolResult = () => {
   const { toast } = useToast();
 
