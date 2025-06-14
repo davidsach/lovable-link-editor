@@ -321,7 +321,7 @@ const ToolTrainer = () => {
   };
 
   const canExecuteAllToolCalls = () => {
-    return currentStep === 'assistant' && getExecutableToolCallsCount() > 1 && getExecutingToolCallsCount() === 0;
+    return getExecutableToolCallsCount() > 0 && getExecutingToolCallsCount() === 0;
   };
 
   const handleSaveConversation = () => {
@@ -938,7 +938,7 @@ const ToolTrainer = () => {
                 </Button>
               )}
 
-              {/* Get All Tool Results Button - Only for assistant with multiple executable tool calls */}
+              {/* Permanent Get All Tool Results Button */}
               {canExecuteAllToolCalls() && (
                 <Button 
                   onClick={executeAllToolCalls}
@@ -950,7 +950,7 @@ const ToolTrainer = () => {
                   ) : (
                     <PlayCircle className="w-4 h-4 mr-2" />
                   )}
-                  Get All Results ({getExecutableToolCallsCount()})
+                  Get All Tool Results ({getExecutableToolCallsCount()})
                 </Button>
               )}
             </div>
