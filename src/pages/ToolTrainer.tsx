@@ -26,9 +26,12 @@ import {
   ChevronDown,
   ChevronUp,
   Bot,
-  Settings
+  Settings,
+  Loader2,
+  CheckCircle,
+  PlayCircle
 } from 'lucide-react';
-import { useTools } from '@/hooks/useApi';
+import { useTools, useExecuteToolResult } from '@/hooks/useApi';
 import { Tool, Message, ConversationState } from '@/types/toolTrainer';
 
 // Mock tools data
@@ -125,8 +128,9 @@ interface ToolCall {
   id: string;
   toolName: string;
   parameters: Record<string, any>;
+  pythonCode: string;
   result: string;
-  isExecuted: boolean;
+  status: 'pending' | 'executing' | 'completed' | 'failed';
 }
 
 const ToolTrainer = () => {
@@ -150,8 +154,10 @@ const ToolTrainer = () => {
   const [messageContent, setMessageContent] = useState('');
   const [toolCalls, setToolCalls] = useState<ToolCall[]>([]);
   const [currentExampleId, setCurrentExampleId] = useState(1);
+  const [hasAddedTextChunk, setHasAddedTextChunk] = useState(false);
 
   const { data: tools, isLoading: toolsLoading, error: toolsError } = useTools();
+  const executeToolMutation = useExecuteToolResult();
   const isConnected = !toolsError;
   const availableTools = tools || mockTools;
 
@@ -178,6 +184,8 @@ const ToolTrainer = () => {
     setShowTextChunk(false);
     setShowToolCall(false);
     setMessageContent('');
+    setHasAddedTextChunk(false);
+    setToolCalls([]);
     
     // Switch to the opposite role
     setCurrentStep(currentStep === 'user' ? 'assistant' : 'user');
@@ -199,6 +207,7 @@ const ToolTrainer = () => {
       
       setMessageContent('');
       setShowTextChunk(false);
+      setHasAddedTextChunk(true);
     }
   };
 
@@ -207,8 +216,9 @@ const ToolTrainer = () => {
       id: `tool_${Date.now()}`,
       toolName: '',
       parameters: {},
+      pythonCode: '',
       result: '',
-      isExecuted: false
+      status: 'pending'
     };
     
     setToolCalls([...toolCalls, newToolCall]);
@@ -219,11 +229,41 @@ const ToolTrainer = () => {
     setToolCalls(prev => prev.map((tc, i) => i === index ? { ...tc, ...updates } : tc));
   };
 
-  const executeToolCall = (index: number) => {
+  const executeToolCall = async (index: number) => {
     const toolCall = toolCalls[index];
-    // Mock execution
-    const mockResult = `Tool ${toolCall.toolName} executed with parameters: ${JSON.stringify(toolCall.parameters)}`;
-    updateToolCall(index, { result: mockResult, isExecuted: true });
+    if (!toolCall.pythonCode.trim()) return;
+
+    updateToolCall(index, { status: 'executing' });
+    
+    try {
+      const result = await executeToolMutation.mutateAsync({
+        code: toolCall.pythonCode
+      });
+      
+      const formattedResult = typeof result.code_output === 'object' 
+        ? JSON.stringify(result.code_output, null, 2)
+        : String(result.code_output);
+        
+      updateToolCall(index, { 
+        result: formattedResult,
+        status: 'completed'
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Execution failed';
+      updateToolCall(index, { 
+        result: `Error: ${errorMessage}`,
+        status: 'failed'
+      });
+    }
+  };
+
+  const executeAllToolCalls = async () => {
+    const pendingToolCalls = toolCalls.filter(tc => tc.status === 'pending' && tc.pythonCode.trim());
+    
+    for (const toolCall of pendingToolCalls) {
+      const index = toolCalls.findIndex(tc => tc.id === toolCall.id);
+      await executeToolCall(index);
+    }
   };
 
   const removeToolCall = (index: number) => {
@@ -244,7 +284,14 @@ const ToolTrainer = () => {
   };
 
   const canAddToolCall = () => {
-    return currentStep === 'assistant' && (toolCalls.length === 0 || toolCalls.every(tc => tc.isExecuted));
+    return currentStep === 'assistant' && (toolCalls.length === 0 || toolCalls.every(tc => tc.status === 'completed' || tc.status === 'failed'));
+  };
+
+  const canAddTextChunk = () => {
+    if (currentStep === 'user') {
+      return !hasAddedTextChunk;
+    }
+    return true; // Assistant can always add text chunks
   };
 
   const hasValidationErrors = () => {
@@ -252,9 +299,13 @@ const ToolTrainer = () => {
       return !messageContent.trim() && showTextChunk;
     } else {
       if (showTextChunk && !messageContent.trim()) return true;
-      if (showToolCall && toolCalls.some(tc => !tc.toolName || !tc.result)) return true;
+      if (showToolCall && toolCalls.some(tc => !tc.toolName || !tc.pythonCode.trim())) return true;
     }
     return false;
+  };
+
+  const getPendingToolCallsCount = () => {
+    return toolCalls.filter(tc => tc.status === 'pending' && tc.pythonCode.trim()).length;
   };
 
   return (
@@ -474,6 +525,12 @@ const ToolTrainer = () => {
                     Validation Error
                   </Badge>
                 )}
+                {currentStep === 'user' && hasAddedTextChunk && (
+                  <Badge variant="default" className="bg-green-600 text-white">
+                    <CheckCircle className="w-3 h-3 mr-1" />
+                    Text Added
+                  </Badge>
+                )}
               </div>
               <Badge variant="outline" className="border-gray-500 text-gray-300">
                 {showTextChunk || toolCalls.length > 0 ? 'Active' : 'Waiting for input'}
@@ -515,7 +572,18 @@ const ToolTrainer = () => {
             {showToolCall && toolCalls.map((toolCall, index) => (
               <div key={toolCall.id} className="space-y-3 border-t border-gray-600 pt-3 mt-3">
                 <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium text-gray-300">Tool Call {index + 1}</label>
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-300">Tool Call {index + 1}</label>
+                    <Badge 
+                      variant={toolCall.status === 'completed' ? 'default' : toolCall.status === 'failed' ? 'destructive' : 'outline'}
+                      className="text-xs"
+                    >
+                      {toolCall.status === 'executing' && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
+                      {toolCall.status === 'completed' && <CheckCircle className="w-3 h-3 mr-1" />}
+                      {toolCall.status === 'failed' && <AlertTriangle className="w-3 h-3 mr-1" />}
+                      {toolCall.status}
+                    </Badge>
+                  </div>
                   <Button 
                     onClick={() => removeToolCall(index)}
                     variant="ghost"
@@ -563,25 +631,60 @@ const ToolTrainer = () => {
                 </div>
                 
                 <div className="space-y-2">
+                  <label className="text-xs text-gray-400">Python Code *</label>
+                  <Textarea
+                    value={toolCall.pythonCode}
+                    onChange={(e) => updateToolCall(index, { pythonCode: e.target.value })}
+                    placeholder="# Write Python code here&#10;import requests&#10;import json&#10;&#10;# Your code here..."
+                    className="min-h-[120px] bg-gray-700 border-gray-600 text-white font-mono text-sm"
+                  />
+                </div>
+                
+                <div className="space-y-2">
                   <label className="text-xs text-gray-400">Tool Result</label>
                   <Textarea
                     value={toolCall.result}
                     onChange={(e) => updateToolCall(index, { result: e.target.value })}
-                    placeholder="Tool result will appear here..."
-                    className="min-h-[80px] bg-gray-700 border-gray-600 text-white"
+                    placeholder="Tool result will appear here after execution..."
+                    className="min-h-[80px] bg-gray-700 border-gray-600 text-white font-mono text-sm"
+                    readOnly
                   />
                 </div>
                 
                 <Button 
                   onClick={() => executeToolCall(index)}
-                  disabled={!toolCall.toolName || toolCall.isExecuted}
+                  disabled={!toolCall.pythonCode.trim() || toolCall.status === 'executing' || toolCall.status === 'completed'}
                   className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
                 >
-                  <Play className="w-4 h-4 mr-2" />
-                  {toolCall.isExecuted ? 'Executed' : 'Execute Tool'}
+                  {toolCall.status === 'executing' ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : toolCall.status === 'completed' ? (
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                  ) : (
+                    <Play className="w-4 h-4 mr-2" />
+                  )}
+                  {toolCall.status === 'executing' ? 'Executing...' : toolCall.status === 'completed' ? 'Executed' : 'Get Result'}
                 </Button>
               </div>
             ))}
+
+            {/* Execute All Button */}
+            {currentStep === 'assistant' && toolCalls.length > 1 && getPendingToolCallsCount() > 0 && (
+              <div className="mt-4 pt-3 border-t border-gray-600">
+                <Button 
+                  onClick={executeAllToolCalls}
+                  disabled={executeToolMutation.isPending}
+                  className="bg-purple-600 hover:bg-purple-700 text-white"
+                >
+                  {executeToolMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <PlayCircle className="w-4 h-4 mr-2" />
+                  )}
+                  Get All Results ({getPendingToolCallsCount()})
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Conversation History */}
@@ -620,11 +723,12 @@ const ToolTrainer = () => {
               {/* Show appropriate buttons based on current step */}
               {!showTextChunk && !showToolCall && (
                 <>
-                  {/* Text chunk button - available for both user and assistant */}
+                  {/* Text chunk button - available based on role and state */}
                   <Button 
                     onClick={() => setShowTextChunk(true)}
+                    disabled={!canAddTextChunk()}
                     variant="outline"
-                    className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
+                    className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 disabled:opacity-50"
                   >
                     <FileText className="w-4 h-4 mr-2" />
                     Add Text Chunk
@@ -645,8 +749,12 @@ const ToolTrainer = () => {
                 </>
               )}
 
+              {/* Status messages */}
+              {currentStep === 'user' && hasAddedTextChunk && (
+                <p className="text-green-400 text-xs">✓ Text chunk added. Switch to new turn to continue.</p>
+              )}
               {currentStep === 'assistant' && !canAddToolCall() && toolCalls.length > 0 && (
-                <p className="text-red-400 text-xs">Complete previous tool call before adding another</p>
+                <p className="text-yellow-400 text-xs">Complete previous tool call before adding another</p>
               )}
             </div>
 
