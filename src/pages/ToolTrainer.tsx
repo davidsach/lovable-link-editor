@@ -36,7 +36,7 @@ import {
   Clock,
   Undo
 } from 'lucide-react';
-import { useTools, useExecuteToolResult } from '@/hooks/useApi';
+import { useTools, useExecuteToolResult, useExecuteAllTools } from '@/hooks/useApi';
 import { Tool, Message, ConversationState } from '@/types/toolTrainer';
 import { SaveConversationDialog } from '@/components/ToolTrainer/SaveConversationDialog';
 import { SavedConversations } from '@/components/ToolTrainer/SavedConversations';
@@ -225,6 +225,7 @@ const ToolTrainer = () => {
   
   const { data: tools, isLoading: toolsLoading, error: toolsError } = useTools();
   const executeToolMutation = useExecuteToolResult();
+  const executeAllToolsMutation = useExecuteAllTools();
   const isConnected = !toolsError;
   const availableTools = tools || mockTools;
 
@@ -353,18 +354,17 @@ const ToolTrainer = () => {
     updateToolCall(index, { status: 'executing' });
     
     try {
-      // TODO: Replace with actual backend API call
-      // const result = await executeToolMutation.mutateAsync({
-      //   code: toolCall.pythonCode
-      // });
+      const result = await executeToolMutation.mutateAsync({
+        code: toolCall.pythonCode
+      });
       
-      // For now, simulate with timeout
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      const mockResult = `Mock result for tool: ${toolCall.toolName}\nCode executed: ${toolCall.pythonCode.slice(0, 50)}...`;
+      // Format the result output
+      const formattedResult = typeof result.code_output === 'object' 
+        ? JSON.stringify(result.code_output, null, 2)
+        : String(result.code_output);
       
       updateToolCall(index, { 
-        result: mockResult,
+        result: formattedResult,
         status: 'completed'
       });
     } catch (error) {
@@ -377,16 +377,56 @@ const ToolTrainer = () => {
   };
 
   const executeAllToolCalls = async () => {
-    const executableToolCalls = toolCalls.filter(tc => 
-      tc.pythonCode.trim() && tc.status !== 'completed' && tc.status !== 'executing'
-    );
+    // Filter tool calls that have code
+    const toolCallsWithCode = toolCalls.filter(tc => tc.pythonCode.trim());
     
-    // Execute tool calls sequentially
-    for (const toolCall of executableToolCalls) {
-      const index = toolCalls.findIndex(tc => tc.id === toolCall.id);
-      await executeToolCall(index);
-      // Small delay between executions
-      await new Promise(resolve => setTimeout(resolve, 500));
+    if (toolCallsWithCode.length === 0) {
+      return;
+    }
+
+    // Set all tool calls to executing status
+    toolCallsWithCode.forEach((toolCall, index) => {
+      const originalIndex = toolCalls.findIndex(tc => tc.id === toolCall.id);
+      updateToolCall(originalIndex, { status: 'executing' });
+    });
+
+    try {
+      // Prepare code chunks for API call
+      const codeChunks = toolCallsWithCode.map((toolCall, index) => ({
+        chunk_id: index,
+        code: toolCall.pythonCode
+      }));
+
+      // Call the API
+      const result = await executeAllToolsMutation.mutateAsync({
+        code_chunks: codeChunks
+      });
+
+      // Update tool calls with results
+      result.code_chunk_output.forEach((output) => {
+        const toolCall = toolCallsWithCode[output.chunk_id];
+        const originalIndex = toolCalls.findIndex(tc => tc.id === toolCall.id);
+        
+        // Format the result output
+        const formattedResult = typeof output.code_output === 'object' 
+          ? JSON.stringify(output.code_output, null, 2)
+          : String(output.code_output);
+        
+        updateToolCall(originalIndex, {
+          result: formattedResult,
+          status: 'completed'
+        });
+      });
+    } catch (error) {
+      // Set all executing tool calls to failed status
+      toolCallsWithCode.forEach((toolCall) => {
+        const originalIndex = toolCalls.findIndex(tc => tc.id === toolCall.id);
+        const errorMessage = error instanceof Error ? error.message : 'Execution failed';
+        updateToolCall(originalIndex, {
+          result: `Error: ${errorMessage}`,
+          status: 'failed'
+        });
+      });
     }
   };
 
@@ -496,7 +536,7 @@ const ToolTrainer = () => {
   };
 
   const canExecuteAllToolCalls = () => {
-    return getExecutableToolCallsCount() > 0 && getExecutingToolCallsCount() === 0;
+    return toolCalls.some(tc => tc.pythonCode.trim()) && !executeAllToolsMutation.isPending;
   };
 
   const canGoBackStep = () => {
@@ -1078,19 +1118,19 @@ const ToolTrainer = () => {
               </Button>
             )}
 
-            {/* Get All Results Button - Show when tool calls are executable */}
-            {canExecuteAllToolCalls() && (
+            {/* Get All Results Button - Always show when there are tool calls with code */}
+            {toolCalls.length > 0 && getToolCallsWithCodeCount() > 0 && (
               <Button 
                 onClick={executeAllToolCalls}
-                disabled={executeToolMutation.isPending}
+                disabled={executeAllToolsMutation.isPending}
                 className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white shadow-lg transition-all duration-200 px-6 h-11"
               >
-                {executeToolMutation.isPending ? (
+                {executeAllToolsMutation.isPending ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 ) : (
                   <PlayCircle className="w-4 h-4 mr-2" />
                 )}
-                Get All Results
+                Get All Results ({getToolCallsWithCodeCount()})
               </Button>
             )}
 
@@ -1146,6 +1186,14 @@ const ToolTrainer = () => {
                 <p className="text-blue-300 flex items-center justify-center">
                   <MessageSquare className="w-4 h-4 mr-2" />
                   User can add only one text chunk per turn. Click "New Turn" to continue.
+                </p>
+              </div>
+            )}
+            {executeAllToolsMutation.isPending && (
+              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 inline-block">
+                <p className="text-yellow-300 flex items-center justify-center">
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Executing {getToolCallsWithCodeCount()} tool calls...
                 </p>
               </div>
             )}
