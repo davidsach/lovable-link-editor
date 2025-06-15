@@ -87,39 +87,6 @@ export const ENDPOINTS = {
      * @param id - ID of the example to delete
      */
     DELETE: (id: string) => `/examples/${id}`
-  },
-  
-  // ---------------------------------------------------------------------------
-  // CONVERSATION ENDPOINTS (Future Implementation)
-  // ---------------------------------------------------------------------------
-  CONVERSATIONS: {
-    /**
-     * GET /conversations - List all conversations
-     */
-    LIST: '/conversations',
-    
-    /**
-     * POST /conversations - Create new conversation
-     */
-    CREATE: '/conversations',
-    
-    /**
-     * GET /conversations/{id} - Get specific conversation
-     * @param id - ID of the conversation to retrieve
-     */
-    GET: (id: string) => `/conversations/${id}`,
-    
-    /**
-     * PUT /conversations/{id} - Update existing conversation
-     * @param id - ID of the conversation to update
-     */
-    UPDATE: (id: string) => `/conversations/${id}`,
-    
-    /**
-     * DELETE /conversations/{id} - Delete conversation
-     * @param id - ID of the conversation to delete
-     */
-    DELETE: (id: string) => `/conversations/${id}`
   }
 } as const;
 
@@ -141,7 +108,5 @@ export const getFullUrl = (endpoint: string): string => {
  * @param newBaseUrl - New base URL to use
  */
 export const updateBaseUrl = (newBaseUrl: string): void => {
-  // Note: This would need to be implemented with a state management solution
-  // for runtime URL changes. Currently API_BASE_URL is a constant.
   console.warn('Base URL update requested:', newBaseUrl);
 };

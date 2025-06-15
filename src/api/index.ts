@@ -74,6 +74,14 @@ export { examplesApi } from './examplesApi';
  * // Execute Python code
  * const result = await toolsApi.executeToolResult({ code: 'print("Hello")' });
  * 
+ * // Execute multiple code chunks
+ * const multiResult = await toolsApi.executeAllTools({
+ *   code_chunks: [
+ *     { chunk_id: 1, code: 'print("First chunk")' },
+ *     { chunk_id: 2, code: 'print("Second chunk")' }
+ *   ]
+ * });
+ * 
  * // Direct API call
  * const response = await apiClient.get('/custom-endpoint');
  * ```
