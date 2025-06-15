@@ -251,6 +251,31 @@ const ToolTrainer = () => {
     setTags(tags.filter(tag => tag !== tagToRemove));
   };
 
+  // Helper function to generate Python function signature
+  const generatePythonSignature = (toolName: string, func: any) => {
+    const params = func.params
+      .map((param: any) => {
+        const paramStr = `${param.param_name}`;
+        if (!param.is_required && param.default_value) {
+          return `${paramStr}="${param.default_value}"`;
+        }
+        return paramStr;
+      })
+      .join(', ');
+    
+    return `${toolName}.${func.func_name}(${params})`;
+  };
+
+  // Copy function signature to clipboard
+  const copySignatureToClipboard = async (signature: string) => {
+    try {
+      await navigator.clipboard.writeText(`print(${signature})`);
+      // Could add a toast notification here if needed
+    } catch (err) {
+      console.error('Failed to copy signature:', err);
+    }
+  };
+
   // =============================================================================
   // CONVERSATION MANAGEMENT
   // =============================================================================
@@ -620,19 +645,45 @@ const ToolTrainer = () => {
                     </div>
                     {tool.functions?.map((func) => (
                       <div key={func.func_name} className="bg-gray-600/60 rounded-lg p-3 mb-2 border border-gray-500/30">
-                        <div className="text-sm font-medium text-white mb-2 flex items-center">
-                          <Zap className="w-3 h-3 mr-1 text-yellow-400" />
-                          {func.func_name}
+                        <div className="text-sm font-medium text-white mb-2 flex items-center justify-between">
+                          <div className="flex items-center">
+                            <Zap className="w-3 h-3 mr-1 text-yellow-400" />
+                            {func.func_name}
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 px-2 text-xs text-blue-300 hover:text-blue-200 hover:bg-blue-500/20"
+                            onClick={() => copySignatureToClipboard(generatePythonSignature(tool.tool_name, func))}
+                          >
+                            Copy
+                          </Button>
                         </div>
+                        
+                        {/* Python Function Signature */}
+                        <div className="bg-gray-800/80 rounded p-2 mb-2 border border-gray-700/50">
+                          <div className="text-xs text-gray-400 mb-1">Python signature:</div>
+                          <code className="text-xs text-green-300 font-mono break-all">
+                            print({generatePythonSignature(tool.tool_name, func)})
+                          </code>
+                        </div>
+                        
+                        {/* Parameters */}
                         <div className="space-y-1">
+                          <div className="text-xs text-gray-400 mb-1">Parameters:</div>
                           {func.params.map((param) => (
                             <div key={param.param_name} className="text-xs text-gray-300 flex items-center justify-between bg-gray-700/50 px-2 py-1 rounded">
-                              <span className="font-mono">{param.param_name}: {param.param_type}</span>
-                              {param.is_required && (
-                                <Badge variant="destructive" className="text-xs px-1 py-0 bg-red-500/20 text-red-300 border-red-400/50">
-                                  required
-                                </Badge>
-                              )}
+                              <span className="font-mono">
+                                {param.param_name}: {param.param_type}
+                                {param.default_value && ` = "${param.default_value}"`}
+                              </span>
+                              <div className="flex items-center gap-1">
+                                {param.is_required && (
+                                  <Badge variant="destructive" className="text-xs px-1 py-0 bg-red-500/20 text-red-300 border-red-400/50">
+                                    required
+                                  </Badge>
+                                )}
+                              </div>
                             </div>
                           ))}
                         </div>
