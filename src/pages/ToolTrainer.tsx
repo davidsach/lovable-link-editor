@@ -535,6 +535,10 @@ const ToolTrainer = () => {
     return toolCalls.filter(tc => tc.status === 'executing').length;
   };
 
+  const getToolCallsWithCodeCount = () => {
+    return toolCalls.filter(tc => tc.pythonCode.trim()).length;
+  };
+
   const canExecuteAllToolCalls = () => {
     return toolCalls.some(tc => tc.pythonCode.trim()) && !executeAllToolsMutation.isPending;
   };
