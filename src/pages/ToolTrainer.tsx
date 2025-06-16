@@ -34,7 +34,9 @@ import {
   Zap,
   MessageSquare,
   Clock,
-  Undo
+  Undo,
+  RefreshCw,
+  Download
 } from 'lucide-react';
 import { useTools, useExecuteToolResult, useExecuteAllTools } from '@/hooks/useApi';
 import { Tool, Message, ConversationState } from '@/types/toolTrainer';
@@ -200,6 +202,7 @@ const ToolTrainer = () => {
   const [expandedTools, setExpandedTools] = useState<Record<string, boolean>>({});
   const [showTextChunkInput, setShowTextChunkInput] = useState(false);
   const [messageContent, setMessageContent] = useState('');
+  const [showAllResults, setShowAllResults] = useState(false);
   
   // Turn management
   const [currentStep, setCurrentStep] = useState<'user' | 'assistant'>('user');
@@ -223,7 +226,7 @@ const ToolTrainer = () => {
   // API HOOKS
   // =============================================================================
   
-  const { data: tools, isLoading: toolsLoading, error: toolsError } = useTools();
+  const { data: tools, isLoading: toolsLoading, error: toolsError, refetch: refetchTools } = useTools();
   const executeToolMutation = useExecuteToolResult();
   const executeAllToolsMutation = useExecuteAllTools();
   const isConnected = !toolsError;
@@ -251,6 +254,21 @@ const ToolTrainer = () => {
     setTags(tags.filter(tag => tag !== tagToRemove));
   };
 
+  // Helper function to generate Python function signature in one line
+  const generateCompactPythonSignature = (toolName: string, func: any) => {
+    const params = func.params
+      .map((param: any) => {
+        const paramStr = `${param.param_name}`;
+        if (!param.is_required && param.default_value) {
+          return `${paramStr}="${param.default_value}"`;
+        }
+        return paramStr;
+      })
+      .join(', ');
+    
+    return `${toolName}.${func.func_name}(${params})`;
+  };
+
   // Helper function to generate Python function signature
   const generatePythonSignature = (toolName: string, func: any) => {
     const params = func.params
@@ -273,6 +291,15 @@ const ToolTrainer = () => {
       // Could add a toast notification here if needed
     } catch (err) {
       console.error('Failed to copy signature:', err);
+    }
+  };
+
+  // Handle getting all tools from backend
+  const handleGetAllTools = async () => {
+    try {
+      await refetchTools();
+    } catch (error) {
+      console.error('Failed to fetch tools:', error);
     }
   };
 
@@ -442,6 +469,9 @@ const ToolTrainer = () => {
           status: 'completed'
         });
       });
+
+      // Show all results section after execution
+      setShowAllResults(true);
     } catch (error) {
       // Set all executing tool calls to failed status
       toolCallsWithCode.forEach((toolCall) => {
@@ -605,7 +635,7 @@ const ToolTrainer = () => {
       {/* Left Sidebar - Available Tools */}
       <div className="w-80 bg-gray-800/90 backdrop-blur border-r border-gray-700/50 flex flex-col shadow-2xl">
         <div className="p-4 border-b border-gray-700/50 bg-gradient-to-r from-blue-600/20 to-purple-600/20">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold text-blue-300 flex items-center">
               <BookOpen className="w-5 h-5 mr-2" />
               Available Tools
@@ -614,6 +644,20 @@ const ToolTrainer = () => {
               {availableTools.length}
             </Badge>
           </div>
+          
+          {/* Get All Tools Button */}
+          <Button
+            onClick={handleGetAllTools}
+            disabled={toolsLoading}
+            className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white disabled:opacity-50 shadow-lg transition-all duration-200"
+          >
+            {toolsLoading ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4 mr-2" />
+            )}
+            Get All Tools
+          </Button>
         </div>
         
         <ScrollArea className="flex-1 p-4">
@@ -637,11 +681,24 @@ const ToolTrainer = () => {
                   )}
                 </div>
                 
+                {/* Function Signatures - Always visible */}
+                <div className="px-3 pb-2">
+                  <div className="space-y-1">
+                    {tool.functions?.map((func) => (
+                      <div key={func.func_name} className="text-xs">
+                        <code className="text-green-300 font-mono bg-gray-800/50 px-2 py-1 rounded border border-gray-700/30 block">
+                          {generateCompactPythonSignature(tool.tool_name, func)}
+                        </code>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
                 {expandedTools[tool.tool_name] && (
                   <div className="px-3 pb-3">
                     <div className="text-xs text-gray-400 mb-2 flex items-center">
                       <Settings className="w-3 h-3 mr-1" />
-                      Functions
+                      Function Details
                     </div>
                     {tool.functions?.map((func) => (
                       <div key={func.func_name} className="bg-gray-600/60 rounded-lg p-3 mb-2 border border-gray-500/30">
@@ -840,6 +897,79 @@ const ToolTrainer = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* All Results Section */}
+        {showAllResults && toolCalls.length > 0 && (
+          <div className="border-b border-gray-700/50 bg-gradient-to-r from-gray-800/90 to-gray-700/90 backdrop-blur p-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white flex items-center">
+                <Download className="w-5 h-5 mr-2 text-green-400" />
+                All Tool Call Results
+              </h3>
+              <Button
+                onClick={() => setShowAllResults(false)}
+                variant="ghost"
+                size="sm"
+                className="text-gray-400 hover:text-white hover:bg-gray-700/50"
+              >
+                Hide Results
+              </Button>
+            </div>
+            
+            <ScrollArea className="max-h-80">
+              <div className="space-y-3">
+                {toolCalls.map((toolCall, index) => (
+                  <div key={toolCall.id} className="bg-gradient-to-r from-gray-700/80 to-gray-600/80 rounded-lg p-4 border border-gray-600/50">
+                    <div className="flex items-center gap-3 mb-3">
+                      <Badge variant="outline" className="bg-blue-500/20 text-blue-300 border-blue-400/50">
+                        #{index + 1}
+                      </Badge>
+                      <span className="text-sm font-medium text-white">
+                        {toolCall.toolName || 'Unknown Tool'}
+                      </span>
+                      <Badge 
+                        variant={
+                          toolCall.status === 'completed' ? 'default' : 
+                          toolCall.status === 'failed' ? 'destructive' : 
+                          toolCall.status === 'executing' ? 'secondary' : 'outline'
+                        }
+                        className={`text-xs ${
+                          toolCall.status === 'completed' ? 'bg-green-500/20 text-green-300 border-green-400/50' :
+                          toolCall.status === 'failed' ? 'bg-red-500/20 text-red-300 border-red-400/50' :
+                          toolCall.status === 'executing' ? 'bg-yellow-500/20 text-yellow-300 border-yellow-400/50' :
+                          'bg-gray-500/20 text-gray-300 border-gray-400/50'
+                        }`}
+                      >
+                        {toolCall.status === 'executing' && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
+                        {toolCall.status === 'completed' && <CheckCircle className="w-3 h-3 mr-1" />}
+                        {toolCall.status === 'failed' && <AlertTriangle className="w-3 h-3 mr-1" />}
+                        {toolCall.status}
+                      </Badge>
+                    </div>
+                    
+                    {toolCall.pythonCode && (
+                      <div className="mb-3">
+                        <div className="text-xs text-gray-400 mb-1">Code:</div>
+                        <pre className="text-xs text-blue-300 bg-gray-900/60 p-2 rounded border border-gray-700/50 font-mono overflow-x-auto">
+                          {toolCall.pythonCode}
+                        </pre>
+                      </div>
+                    )}
+                    
+                    {toolCall.result && (
+                      <div>
+                        <div className="text-xs text-gray-400 mb-1">Result:</div>
+                        <pre className="text-xs text-gray-300 bg-gray-900/60 p-2 rounded border border-gray-700/50 font-mono overflow-x-auto">
+                          {toolCall.result}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+        )}
 
         {/* Main conversation area */}
         <div className="flex-1 flex flex-col bg-gradient-to-b from-gray-900/50 to-gray-800/50">
