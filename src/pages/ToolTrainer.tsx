@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -898,76 +899,81 @@ const ToolTrainer = () => {
           </Card>
         </div>
 
-        {/* All Results Section */}
+        {/* All Results Section - Fixed scrolling */}
         {showAllResults && toolCalls.length > 0 && (
-          <div className="border-b border-gray-700/50 bg-gradient-to-r from-gray-800/90 to-gray-700/90 backdrop-blur p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-white flex items-center">
-                <Download className="w-5 h-5 mr-2 text-green-400" />
-                All Tool Call Results
-              </h3>
-              <Button
-                onClick={() => setShowAllResults(false)}
-                variant="ghost"
-                size="sm"
-                className="text-gray-400 hover:text-white hover:bg-gray-700/50"
-              >
-                Hide Results
-              </Button>
-            </div>
-            
-            <ScrollArea className="max-h-80">
-              <div className="space-y-3">
-                {toolCalls.map((toolCall, index) => (
-                  <div key={toolCall.id} className="bg-gradient-to-r from-gray-700/80 to-gray-600/80 rounded-lg p-4 border border-gray-600/50">
-                    <div className="flex items-center gap-3 mb-3">
-                      <Badge variant="outline" className="bg-blue-500/20 text-blue-300 border-blue-400/50">
-                        #{index + 1}
-                      </Badge>
-                      <span className="text-sm font-medium text-white">
-                        {toolCall.toolName || 'Unknown Tool'}
-                      </span>
-                      <Badge 
-                        variant={
-                          toolCall.status === 'completed' ? 'default' : 
-                          toolCall.status === 'failed' ? 'destructive' : 
-                          toolCall.status === 'executing' ? 'secondary' : 'outline'
-                        }
-                        className={`text-xs ${
-                          toolCall.status === 'completed' ? 'bg-green-500/20 text-green-300 border-green-400/50' :
-                          toolCall.status === 'failed' ? 'bg-red-500/20 text-red-300 border-red-400/50' :
-                          toolCall.status === 'executing' ? 'bg-yellow-500/20 text-yellow-300 border-yellow-400/50' :
-                          'bg-gray-500/20 text-gray-300 border-gray-400/50'
-                        }`}
-                      >
-                        {toolCall.status === 'executing' && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
-                        {toolCall.status === 'completed' && <CheckCircle className="w-3 h-3 mr-1" />}
-                        {toolCall.status === 'failed' && <AlertTriangle className="w-3 h-3 mr-1" />}
-                        {toolCall.status}
-                      </Badge>
-                    </div>
-                    
-                    {toolCall.pythonCode && (
-                      <div className="mb-3">
-                        <div className="text-xs text-gray-400 mb-1">Code:</div>
-                        <pre className="text-xs text-blue-300 bg-gray-900/60 p-2 rounded border border-gray-700/50 font-mono overflow-x-auto">
-                          {toolCall.pythonCode}
-                        </pre>
-                      </div>
-                    )}
-                    
-                    {toolCall.result && (
-                      <div>
-                        <div className="text-xs text-gray-400 mb-1">Result:</div>
-                        <pre className="text-xs text-gray-300 bg-gray-900/60 p-2 rounded border border-gray-700/50 font-mono overflow-x-auto">
-                          {toolCall.result}
-                        </pre>
-                      </div>
-                    )}
-                  </div>
-                ))}
+          <div className="border-b border-gray-700/50 bg-gradient-to-r from-gray-800/90 to-gray-700/90 backdrop-blur">
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-white flex items-center">
+                  <Download className="w-5 h-5 mr-2 text-green-400" />
+                  All Tool Call Results
+                </h3>
+                <Button
+                  onClick={() => setShowAllResults(false)}
+                  variant="ghost"
+                  size="sm"
+                  className="text-gray-400 hover:text-white hover:bg-gray-700/50"
+                >
+                  Hide Results
+                </Button>
               </div>
-            </ScrollArea>
+              
+              {/* Fixed height and proper scrolling */}
+              <div className="h-96 overflow-hidden">
+                <ScrollArea className="h-full w-full">
+                  <div className="space-y-3 pr-4">
+                    {toolCalls.map((toolCall, index) => (
+                      <div key={toolCall.id} className="bg-gradient-to-r from-gray-700/80 to-gray-600/80 rounded-lg p-4 border border-gray-600/50">
+                        <div className="flex items-center gap-3 mb-3">
+                          <Badge variant="outline" className="bg-blue-500/20 text-blue-300 border-blue-400/50">
+                            #{index + 1}
+                          </Badge>
+                          <span className="text-sm font-medium text-white">
+                            {toolCall.toolName || 'Unknown Tool'}
+                          </span>
+                          <Badge 
+                            variant={
+                              toolCall.status === 'completed' ? 'default' : 
+                              toolCall.status === 'failed' ? 'destructive' : 
+                              toolCall.status === 'executing' ? 'secondary' : 'outline'
+                            }
+                            className={`text-xs ${
+                              toolCall.status === 'completed' ? 'bg-green-500/20 text-green-300 border-green-400/50' :
+                              toolCall.status === 'failed' ? 'bg-red-500/20 text-red-300 border-red-400/50' :
+                              toolCall.status === 'executing' ? 'bg-yellow-500/20 text-yellow-300 border-yellow-400/50' :
+                              'bg-gray-500/20 text-gray-300 border-gray-400/50'
+                            }`}
+                          >
+                            {toolCall.status === 'executing' && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
+                            {toolCall.status === 'completed' && <CheckCircle className="w-3 h-3 mr-1" />}
+                            {toolCall.status === 'failed' && <AlertTriangle className="w-3 h-3 mr-1" />}
+                            {toolCall.status}
+                          </Badge>
+                        </div>
+                        
+                        {toolCall.pythonCode && (
+                          <div className="mb-3">
+                            <div className="text-xs text-gray-400 mb-1">Code:</div>
+                            <pre className="text-xs text-blue-300 bg-gray-900/60 p-2 rounded border border-gray-700/50 font-mono overflow-x-auto">
+                              {toolCall.pythonCode}
+                            </pre>
+                          </div>
+                        )}
+                        
+                        {toolCall.result && (
+                          <div>
+                            <div className="text-xs text-gray-400 mb-1">Result:</div>
+                            <pre className="text-xs text-gray-300 bg-gray-900/60 p-2 rounded border border-gray-700/50 font-mono overflow-x-auto max-h-32 overflow-y-auto">
+                              {toolCall.result}
+                            </pre>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+            </div>
           </div>
         )}
 
