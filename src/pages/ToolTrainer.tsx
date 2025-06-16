@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -142,11 +143,6 @@ const ToolTrainer = () => {
                             <div key={tool.tool_name} className="p-2 rounded border border-gray-200">
                               <h4 className="font-medium">{tool.tool_name}</h4>
                               <p className="text-sm text-gray-500">{tool.description}</p>
-                              {tool.function_signature && (
-                                <p className="text-xs font-mono bg-gray-100 p-1 rounded mt-1">
-                                  {tool.function_signature}
-                                </p>
-                              )}
                             </div>
                           ))}
                         </div>
