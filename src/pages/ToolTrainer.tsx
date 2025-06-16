@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useTools, useExecuteToolResult, useExecuteAllTools } from '@/hooks/useApi';
 import { Tool, CodeChunk } from '@/api/types';
 import ExamplesManager from '@/components/ToolTrainer/ExamplesManager';
+import { Link } from 'react-router-dom';
 
 const ToolTrainer = () => {
   const [pythonCode, setPythonCode] = useState('');
@@ -18,9 +19,18 @@ const ToolTrainer = () => {
   const [allToolCallResultsVisible, setAllToolCallResultsVisible] = useState(false);
   const { toast } = useToast();
 
-  const { data: tools, isLoading: toolsLoading, error: toolsError } = useTools();
+  const { data: tools, isLoading: toolsLoading, error: toolsError, refetch: refetchTools } = useTools();
   const executeToolResultMutation = useExecuteToolResult();
   const executeAllToolsMutation = useExecuteAllTools();
+
+  const handleGetAllTools = () => {
+    refetchTools();
+    setAvailableToolsVisible(true);
+    toast({
+      title: "Tools Fetched",
+      description: "Successfully fetched all available tools from the backend.",
+    });
+  };
 
   const handleExecuteCode = () => {
     executeToolResultMutation.mutate(
@@ -81,7 +91,14 @@ const ToolTrainer = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow-md p-4">
-        <h1 className="text-2xl font-semibold">Tool Trainer</h1>
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-semibold">Tool Trainer</h1>
+          <Link to="/toy-examples">
+            <Button variant="outline">
+              Manage Toy Examples
+            </Button>
+          </Link>
+        </div>
       </header>
 
       <div className="flex">
@@ -102,14 +119,14 @@ const ToolTrainer = () => {
 
             <Separator />
 
-            {/* Available Tools Section */}
+            {/* Get All Tools Section */}
             <div>
-              <Button variant="secondary" onClick={() => setAvailableToolsVisible(!availableToolsVisible)}>
-                {availableToolsVisible ? 'Hide Available Tools' : 'Show Available Tools'}
+              <Button variant="default" onClick={handleGetAllTools} className="w-full mb-4">
+                Get All Tools
               </Button>
 
               {availableToolsVisible && (
-                <Card className="mt-4">
+                <Card>
                   <CardHeader>
                     <CardTitle>Available Tools</CardTitle>
                   </CardHeader>
@@ -125,6 +142,11 @@ const ToolTrainer = () => {
                             <div key={tool.tool_name} className="p-2 rounded border border-gray-200">
                               <h4 className="font-medium">{tool.tool_name}</h4>
                               <p className="text-sm text-gray-500">{tool.description}</p>
+                              {tool.function_signature && (
+                                <p className="text-xs font-mono bg-gray-100 p-1 rounded mt-1">
+                                  {tool.function_signature}
+                                </p>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -149,7 +171,7 @@ const ToolTrainer = () => {
                     <CardTitle>All Tool Call Results</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <ScrollArea className="h-48">
+                    <div className="h-64 overflow-y-auto">
                       <div className="space-y-2">
                         {toolCallResults.map((call, index) => (
                           <div key={index} className="p-2 rounded border border-gray-200">
@@ -169,7 +191,7 @@ const ToolTrainer = () => {
                           </div>
                         ))}
                       </div>
-                    </ScrollArea>
+                    </div>
                   </CardContent>
                 </Card>
               )}
