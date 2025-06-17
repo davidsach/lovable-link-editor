@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -43,6 +42,9 @@ import { useTools, useExecuteToolResult, useExecuteAllTools } from '@/hooks/useA
 import { Tool, Message, ConversationState } from '@/types/toolTrainer';
 import { SaveConversationDialog } from '@/components/ToolTrainer/SaveConversationDialog';
 import { SavedConversations } from '@/components/ToolTrainer/SavedConversations';
+import { SaveToDatabase } from '@/components/ToolTrainer/SaveToDatabase';
+import { RetrieveExample } from '@/components/ToolTrainer/RetrieveExample';
+import { EditExample } from '@/components/ToolTrainer/EditExample';
 
 // Mock tools data - This will be replaced with real API data
 const mockTools: Tool[] = [
@@ -302,6 +304,41 @@ const ToolTrainer = () => {
     } catch (error) {
       console.error('Failed to fetch tools:', error);
     }
+  };
+
+  // Add new event handler for retrieved examples
+  const handleExampleRetrieved = (example: any) => {
+    // Load the retrieved example into the current conversation
+    setConversation(prev => ({
+      ...prev,
+      id: example.id,
+      title: example.name,
+      messages: example.messages || []
+    }));
+    setExampleName(example.name);
+    setDescription(example.description || '');
+    setConversationStarted(example.messages?.length > 0);
+    
+    // Reset current state
+    setToolCalls([]);
+    setCurrentStep('user');
+    setShowTextChunkInput(false);
+    setMessageContent('');
+    setHasAddedTextChunk(false);
+    
+    console.log('Example loaded successfully:', example);
+  };
+
+  // Add new event handler for updated examples
+  const handleExampleUpdated = (updatedExample: any) => {
+    setExampleName(updatedExample.name);
+    setDescription(updatedExample.description || '');
+    setConversation(prev => ({
+      ...prev,
+      title: updatedExample.name
+    }));
+    
+    console.log('Example updated successfully:', updatedExample);
   };
 
   // =============================================================================
@@ -1346,7 +1383,30 @@ const ToolTrainer = () => {
               Back
             </Button>
 
-            {/* Save Button - Using the existing SaveConversationDialog */}
+            {/* Save to Database Button */}
+            <SaveToDatabase
+              messages={conversation.messages}
+              exampleName={exampleName}
+              description={description}
+            />
+
+            {/* Retrieve Example Button */}
+            <RetrieveExample
+              onExampleRetrieved={handleExampleRetrieved}
+            />
+
+            {/* Edit Example Button */}
+            <EditExample
+              currentExample={{
+                id: conversation.id,
+                name: exampleName,
+                description: description,
+                messages: conversation.messages
+              }}
+              onExampleUpdated={handleExampleUpdated}
+            />
+
+            {/* Save Conversation Button - Using the existing SaveConversationDialog */}
             <SaveConversationDialog 
               messages={conversation.messages}
               exampleName={exampleName}
