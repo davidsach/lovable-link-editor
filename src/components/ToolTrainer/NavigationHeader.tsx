@@ -51,7 +51,7 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
         <SaveToDatabase 
           userQuery={currentExample.user_query}
           assistantResponse={currentExample.assistant_response}
-          toolCalls={currentExample.toolCalls}
+          toolCalls={currentExample.tool_calls}
           exampleName={currentExample.name}
           tags={currentExample.metadata?.tags}
         />

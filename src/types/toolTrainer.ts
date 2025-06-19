@@ -55,15 +55,17 @@ export interface TrainingExample {
   };
 }
 
+// Unified SavedConversation interface to match database schema
 export interface SavedConversation {
-  id: string;
-  name: string;
-  description: string;
+  id: number;
+  name?: string;
+  description?: string;
   user_query: string;
   assistant_response: string;
   tool_calls: ToolCall[];
   tags: string[];
   created_at: string;
+  updated_at?: string;
 }
 
 // For database operations - matches your exact schema

@@ -170,6 +170,7 @@ export interface TrainingExample {
   name: string;
   description: string;
   tags: string[];
+  user_query: string;
   user_prompt: string;
   steps: TrainingStep[];
   created: string;
@@ -179,9 +180,16 @@ export interface TrainingExample {
 /**
  * Request to Create New Training Example
  */
-export interface CreateExampleRequest extends TrainingExample {}
+export interface CreateExampleRequest {
+  name?: string;
+  description?: string;
+  user_query: string;
+  assistant_response: string;
+  tool_calls: any[];
+  tags?: string[];
+}
 
 /**
  * Request to Update Existing Training Example
  */
-export interface UpdateExampleRequest extends Partial<TrainingExample> {}
+export interface UpdateExampleRequest extends Partial<CreateExampleRequest> {}

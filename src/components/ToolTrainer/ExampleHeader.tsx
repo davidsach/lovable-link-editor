@@ -100,7 +100,7 @@ export const ExampleHeader: React.FC<ExampleHeaderProps> = ({
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700">Example Name</label>
             <Input
-              value={example.name}
+              value={example.name || ''}
               onChange={(e) => updateExample({ name: e.target.value })}
               placeholder="Enter example name..."
             />
@@ -136,7 +136,7 @@ export const ExampleHeader: React.FC<ExampleHeaderProps> = ({
         <div className="space-y-2">
           <label className="text-sm font-medium text-gray-700">Description</label>
           <Textarea
-            value={example.description}
+            value={example.description || ''}
             onChange={(e) => updateExample({ description: e.target.value })}
             placeholder="Describe what this training example demonstrates..."
             className="min-h-[60px]"
@@ -153,7 +153,7 @@ export const ExampleHeader: React.FC<ExampleHeaderProps> = ({
             Updated: {new Date(example.metadata.updated_at).toLocaleDateString()}
           </div>
           <Badge variant="outline">
-            {example.toolCalls?.length || 0} tool call{(example.toolCalls?.length || 0) !== 1 ? 's' : ''}
+            {example.tool_calls?.length || 0} tool call{(example.tool_calls?.length || 0) !== 1 ? 's' : ''}
           </Badge>
         </div>
       </CardContent>

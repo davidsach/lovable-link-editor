@@ -89,9 +89,17 @@ export const ToolCallStep: React.FC<ToolCallStepProps> = ({
         parameters: localParameters
       });
       
-      const formattedResult = typeof result.result === 'object' 
-        ? JSON.stringify(result.result, null, 2)
-        : String(result.result);
+      // Safely handle the result
+      let formattedResult: string;
+      if (result && typeof result === 'object' && 'result' in result) {
+        formattedResult = typeof result.result === 'object' 
+          ? JSON.stringify(result.result, null, 2)
+          : String(result.result);
+      } else {
+        formattedResult = typeof result === 'object' 
+          ? JSON.stringify(result, null, 2)
+          : String(result);
+      }
         
       onToolResultChange(formattedResult);
       onExecute();
