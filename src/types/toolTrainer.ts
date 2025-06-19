@@ -17,10 +17,10 @@ export interface ToolCall {
 
 export interface ConversationState {
   id: string;
-  userQuery: string;              // The user's input/question
-  assistantResponse: string;      // The assistant's tool call/code
-  toolCalls: ToolCall[];          // Array of tool call objects
-  tags: string[];                 // Optional: array of tags
+  userQuery: string;
+  assistantResponse: string;
+  toolCalls: ToolCall[];
+  tags: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -40,13 +40,14 @@ export interface Tool {
   }>;
 }
 
+// Updated to match your database schema exactly
 export interface TrainingExample {
   id: number;
-  name: string;
-  description: string;
-  userQuery: string;
-  assistantResponse: string;
-  toolCalls: ToolCall[];
+  name?: string;
+  description?: string;
+  user_query: string;
+  assistant_response: string;
+  tool_calls: ToolCall[];
   metadata: {
     created_at: string;
     updated_at: string;
@@ -58,9 +59,22 @@ export interface SavedConversation {
   id: string;
   name: string;
   description: string;
-  userQuery: string;
-  assistantResponse: string;
-  toolCalls: ToolCall[];
+  user_query: string;
+  assistant_response: string;
+  tool_calls: ToolCall[];
   tags: string[];
   created_at: string;
+}
+
+// For database operations - matches your exact schema
+export interface DatabaseExample {
+  id?: number;
+  name?: string;
+  description?: string;
+  user_query: string;
+  assistant_response: string;
+  tool_calls: any[];
+  tags?: string[];
+  created_at?: string;
+  updated_at?: string;
 }

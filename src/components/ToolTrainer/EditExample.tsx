@@ -6,17 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Edit, Loader2, Save } from 'lucide-react';
+import { DatabaseExample } from '../../types/toolTrainer';
 
 interface EditExampleProps {
-  currentExample: {
-    id?: string;
-    name: string;
-    description?: string;
-    userQuery: string;
-    assistantResponse: string;
-    toolCalls: any[];
-  };
-  onExampleUpdated: (updatedExample: any) => void;
+  currentExample: DatabaseExample;
+  onExampleUpdated: (updatedExample: DatabaseExample) => void;
 }
 
 export const EditExample: React.FC<EditExampleProps> = ({
@@ -25,28 +19,47 @@ export const EditExample: React.FC<EditExampleProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [name, setName] = useState(currentExample.name);
+  const [name, setName] = useState(currentExample.name || '');
   const [description, setDescription] = useState(currentExample.description || '');
+  const [userQuery, setUserQuery] = useState(currentExample.user_query || '');
+  const [assistantResponse, setAssistantResponse] = useState(currentExample.assistant_response || '');
+  const [tags, setTags] = useState(currentExample.tags?.join(', ') || '');
 
   const handleUpdate = async () => {
+    if (!currentExample.id) {
+      console.error('Cannot update example without ID');
+      return;
+    }
+
     setIsUpdating(true);
     
     try {
-      // TODO: Replace with actual API call to backend
-      const updatedExample = {
-        ...currentExample,
-        name,
-        description,
-        updated_at: new Date().toISOString()
+      const updatedData = {
+        name: name.trim() || `Example ${currentExample.id}`,
+        description: description.trim(),
+        user_query: userQuery.trim(),
+        assistant_response: assistantResponse.trim(),
+        tags: tags.split(',').map(tag => tag.trim()).filter(tag => tag)
       };
       
-      console.log('Updating example:', updatedExample);
+      console.log('Updating example:', currentExample.id, updatedData);
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      const response = await fetch(`http://127.0.0.1:8000/examples/${currentExample.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        throw new Error(`Failed to update example: ${response.status} - ${errorData}`);
+      }
+
+      const updatedExample = await response.json();
       onExampleUpdated(updatedExample);
-      console.log('Example updated successfully');
+      console.log('Example updated successfully:', updatedExample);
       setIsOpen(false);
     } catch (error) {
       console.error('Error updating example:', error);
@@ -60,8 +73,11 @@ export const EditExample: React.FC<EditExampleProps> = ({
   const handleOpenChange = (open: boolean) => {
     setIsOpen(open);
     if (open) {
-      setName(currentExample.name);
+      setName(currentExample.name || '');
       setDescription(currentExample.description || '');
+      setUserQuery(currentExample.user_query || '');
+      setAssistantResponse(currentExample.assistant_response || '');
+      setTags(currentExample.tags?.join(', ') || '');
     }
   };
 
@@ -77,9 +93,9 @@ export const EditExample: React.FC<EditExampleProps> = ({
         </Button>
       </DialogTrigger>
       
-      <DialogContent className="bg-gray-800 border-gray-600 text-white">
+      <DialogContent className="bg-gray-800 border-gray-600 text-white max-w-4xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-orange-300">Edit/Update Example</DialogTitle>
+          <DialogTitle className="text-orange-300">Edit Example</DialogTitle>
         </DialogHeader>
         
         <div className="space-y-4">
@@ -87,9 +103,8 @@ export const EditExample: React.FC<EditExampleProps> = ({
             <div className="text-sm text-gray-300 mb-2">Current Example:</div>
             <div className="text-xs text-gray-400">
               • ID: {currentExample.id || 'New Example'}
-              • User Query: {currentExample.userQuery ? 'Present' : 'Not set'}
-              • Assistant Response: {currentExample.assistantResponse ? 'Present' : 'Not set'}
-              • Tool Calls: {currentExample.toolCalls?.length || 0}
+              • Created: {currentExample.created_at ? new Date(currentExample.created_at).toLocaleDateString() : 'Unknown'}
+              • Tool Calls: {currentExample.tool_calls?.length || 0}
             </div>
           </div>
           
@@ -114,11 +129,44 @@ export const EditExample: React.FC<EditExampleProps> = ({
               className="bg-gray-700 border-gray-600 text-white min-h-[80px]"
             />
           </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="editUserQuery" className="text-gray-300">User Query</Label>
+            <Textarea
+              id="editUserQuery"
+              value={userQuery}
+              onChange={(e) => setUserQuery(e.target.value)}
+              placeholder="Enter user query..."
+              className="bg-gray-700 border-gray-600 text-white min-h-[80px]"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="editAssistantResponse" className="text-gray-300">Assistant Response</Label>
+            <Textarea
+              id="editAssistantResponse"
+              value={assistantResponse}
+              onChange={(e) => setAssistantResponse(e.target.value)}
+              placeholder="Enter assistant response..."
+              className="bg-gray-700 border-gray-600 text-white min-h-[100px]"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="editTags" className="text-gray-300">Tags (comma separated)</Label>
+            <Input
+              id="editTags"
+              value={tags}
+              onChange={(e) => setTags(e.target.value)}
+              placeholder="Enter tags separated by commas..."
+              className="bg-gray-700 border-gray-600 text-white"
+            />
+          </div>
           
           <div className="flex gap-3 pt-4">
             <Button
               onClick={handleUpdate}
-              disabled={!name.trim() || isUpdating}
+              disabled={!userQuery.trim() || isUpdating}
               className="flex-1 bg-orange-600 hover:bg-orange-700 text-white"
             >
               {isUpdating ? (

@@ -3,7 +3,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { SavedConversations } from './SavedConversations';
-import { SaveConversationDialog } from './SaveConversationDialog';
+import { SaveToDatabase } from './SaveToDatabase';
 import { TrainingExample, SavedConversation } from '../../types/toolTrainer';
 
 interface NavigationHeaderProps {
@@ -48,11 +48,12 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
       
       <div className="flex items-center gap-3">
         <SavedConversations onLoadConversation={onLoadConversation} />
-        <SaveConversationDialog 
-          userQuery={currentExample.userQuery}
-          assistantResponse={currentExample.assistantResponse}
+        <SaveToDatabase 
+          userQuery={currentExample.user_query}
+          assistantResponse={currentExample.assistant_response}
           toolCalls={currentExample.toolCalls}
           exampleName={currentExample.name}
+          tags={currentExample.metadata?.tags}
         />
       </div>
     </div>
