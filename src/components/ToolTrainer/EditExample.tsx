@@ -12,7 +12,9 @@ interface EditExampleProps {
     id?: string;
     name: string;
     description?: string;
-    messages: any[];
+    userQuery: string;
+    assistantResponse: string;
+    toolCalls: any[];
   };
   onExampleUpdated: (updatedExample: any) => void;
 }
@@ -85,7 +87,9 @@ export const EditExample: React.FC<EditExampleProps> = ({
             <div className="text-sm text-gray-300 mb-2">Current Example:</div>
             <div className="text-xs text-gray-400">
               • ID: {currentExample.id || 'New Example'}
-              • Messages: {currentExample.messages?.length || 0}
+              • User Query: {currentExample.userQuery ? 'Present' : 'Not set'}
+              • Assistant Response: {currentExample.assistantResponse ? 'Present' : 'Not set'}
+              • Tool Calls: {currentExample.toolCalls?.length || 0}
             </div>
           </div>
           

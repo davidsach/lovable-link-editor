@@ -1,4 +1,3 @@
-
 /**
  * Examples API Functions
  * All training example-related API operations
@@ -47,7 +46,7 @@ export const examplesApi = {
     }
     
     const example = await apiClient.get<TrainingExample>(ENDPOINTS.EXAMPLES.GET(id));
-    console.log(`✅ Retrieved training example: ${example.name}`);
+    console.log(`✅ Retrieved training example: ${example.user_query}`);
     return example;
   },
 
@@ -57,10 +56,10 @@ export const examplesApi = {
    * @returns Promise<ApiResponse<TrainingExample>> - Creation result
    */
   async createExample(example: CreateExampleRequest): Promise<ApiResponse<TrainingExample>> {
-    console.log('📝 Creating new training example:', example.name);
+    console.log('📝 Creating new training example:', example.user_query);
     
-    if (!example.name || example.name.trim() === '') {
-      throw new Error('Example name is required');
+    if (!example.user_query || example.user_query.trim() === '') {
+      throw new Error('Example user_query is required');
     }
     
     const result = await apiClient.post<ApiResponse<TrainingExample>>(
@@ -68,7 +67,7 @@ export const examplesApi = {
       example
     );
     
-    console.log(`✅ Training example created successfully: ${example.name}`);
+    console.log(`✅ Training example created successfully: ${example.user_query}`);
     return result;
   },
 

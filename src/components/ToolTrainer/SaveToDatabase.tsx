@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -6,42 +5,52 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Save, Loader2 } from 'lucide-react';
-import { Message } from '@/types/toolTrainer';
 
 interface SaveToDatabaseProps {
-  messages: Message[];
-  exampleName: string;
-  description?: string;
+  userQuery: string;
+  assistantResponse: string;
+  toolCalls: any[]; // Adjust type as needed
+  tags?: string[];
 }
 
 export const SaveToDatabase: React.FC<SaveToDatabaseProps> = ({
-  messages,
-  exampleName,
-  description = ''
+  userQuery,
+  assistantResponse,
+  toolCalls,
+  tags = []
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [name, setName] = useState(exampleName);
-  const [desc, setDesc] = useState(description);
+
+  // Optional: allow editing tags in the UI
+  const [localTags, setLocalTags] = useState(tags);
 
   const handleSave = async () => {
     setIsSaving(true);
-    
+
     try {
-      // TODO: Replace with actual API call to backend
-      const conversationData = {
-        name,
-        description: desc,
-        messages,
-        created_at: new Date().toISOString()
+      // Prepare the payload for your backend
+      const payload = {
+        user_query: userQuery,
+        assistant_response: assistantResponse,
+        tool_calls: toolCalls,
+        tags: localTags,
       };
-      
-      console.log('Saving conversation to database:', conversationData);
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // TODO: Handle successful save response
+
+      console.log('Saving conversation to database:', payload);
+
+      // Send POST request to backend
+      const response = await fetch('http://127.0.0.1:8000/examples/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save conversation');
+      }
+
+      // Handle successful save response
       console.log('Conversation saved successfully');
       setIsOpen(false);
     } catch (error) {
@@ -64,46 +73,51 @@ export const SaveToDatabase: React.FC<SaveToDatabaseProps> = ({
         </Button>
       </DialogTrigger>
       
-      <DialogContent className="bg-gray-800 border-gray-600 text-white">
+      <DialogContent
+        className="bg-gray-800 border-gray-600 text-white"
+        aria-describedby="save-to-db-description"
+      >
         <DialogHeader>
           <DialogTitle className="text-purple-300">Save Conversation to Database</DialogTitle>
         </DialogHeader>
-        
-        <div className="space-y-4">
+
+        <div id="save-to-db-description" className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name" className="text-gray-300">Example Name</Label>
+            <Label htmlFor="user_query" className="text-gray-300">User Query</Label>
+            <Textarea
+              id="user_query"
+              value={userQuery}
+              readOnly
+              className="bg-gray-700 border-gray-600 text-white min-h-[60px]"
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="assistant_response" className="text-gray-300">Assistant Response</Label>
+            <Textarea
+              id="assistant_response"
+              value={assistantResponse}
+              readOnly
+              className="bg-gray-700 border-gray-600 text-white min-h-[60px]"
+            />
+          </div>
+
+          {/* Optionally: tags input */}
+          {/* <div className="space-y-2">
+            <Label htmlFor="tags" className="text-gray-300">Tags</Label>
             <Input
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Enter example name..."
+              id="tags"
+              value={localTags.join(', ')}
+              onChange={e => setLocalTags(e.target.value.split(',').map(tag => tag.trim()))}
+              placeholder="Enter tags separated by commas"
               className="bg-gray-700 border-gray-600 text-white"
             />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="description" className="text-gray-300">Description</Label>
-            <Textarea
-              id="description"
-              value={desc}
-              onChange={(e) => setDesc(e.target.value)}
-              placeholder="Describe this training example..."
-              className="bg-gray-700 border-gray-600 text-white min-h-[80px]"
-            />
-          </div>
-          
-          <div className="bg-gray-700/50 p-3 rounded border border-gray-600">
-            <div className="text-sm text-gray-300 mb-2">Conversation Summary:</div>
-            <div className="text-xs text-gray-400">
-              • {messages.length} message{messages.length !== 1 ? 's' : ''}
-              • Created: {new Date().toLocaleDateString()}
-            </div>
-          </div>
-          
+          </div> */}
+
           <div className="flex gap-3 pt-4">
             <Button
               onClick={handleSave}
-              disabled={!name.trim() || isSaving}
+              disabled={isSaving}
               className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
             >
               {isSaving ? (

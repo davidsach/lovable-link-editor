@@ -153,7 +153,7 @@ export const ExampleHeader: React.FC<ExampleHeaderProps> = ({
             Updated: {new Date(example.metadata.updated_at).toLocaleDateString()}
           </div>
           <Badge variant="outline">
-            {example.messages.length} message{example.messages.length !== 1 ? 's' : ''}
+            {example.toolCalls?.length || 0} tool call{(example.toolCalls?.length || 0) !== 1 ? 's' : ''}
           </Badge>
         </div>
       </CardContent>

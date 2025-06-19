@@ -17,9 +17,10 @@ export interface ToolCall {
 
 export interface ConversationState {
   id: string;
-  title: string;
-  messages: Message[];
-  toolCalls: ToolCall[];
+  userQuery: string;              // The user's input/question
+  assistantResponse: string;      // The assistant's tool call/code
+  toolCalls: ToolCall[];          // Array of tool call objects
+  tags: string[];                 // Optional: array of tags
   createdAt: Date;
   updatedAt: Date;
 }
@@ -43,7 +44,9 @@ export interface TrainingExample {
   id: number;
   name: string;
   description: string;
-  messages: Message[];
+  userQuery: string;
+  assistantResponse: string;
+  toolCalls: ToolCall[];
   metadata: {
     created_at: string;
     updated_at: string;
@@ -55,6 +58,9 @@ export interface SavedConversation {
   id: string;
   name: string;
   description: string;
-  messages: Message[];
+  userQuery: string;
+  assistantResponse: string;
+  toolCalls: ToolCall[];
+  tags: string[];
   created_at: string;
 }

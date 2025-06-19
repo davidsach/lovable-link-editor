@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,7 +41,7 @@ import {
 } from 'lucide-react';
 import { useTools, useExecuteToolResult, useExecuteAllTools } from '@/hooks/useApi';
 import { Tool, Message, ConversationState } from '@/types/toolTrainer';
-import { SaveConversationDialog } from '@/components/ToolTrainer/SaveConversationDialog';
+
 import { SavedConversations } from '@/components/ToolTrainer/SavedConversations';
 import { SaveToDatabase } from '@/components/ToolTrainer/SaveToDatabase';
 import { RetrieveExample } from '@/components/ToolTrainer/RetrieveExample';
@@ -188,9 +189,10 @@ const ToolTrainer = () => {
   // Core conversation state
   const [conversation, setConversation] = useState<ConversationState>({
     id: '1',
-    title: 'Example 1',
-    messages: [],
+    userQuery: '',
+    assistantResponse: '',
     toolCalls: [],
+    tags: [],
     createdAt: new Date(),
     updatedAt: new Date()
   });
@@ -220,10 +222,21 @@ const ToolTrainer = () => {
   
   // History for step-wise back functionality
   const [conversationHistory, setConversationHistory] = useState<{
-    messages: Message[];
+    userQuery: string;
+    assistantResponse: string;
     toolCalls: ToolCall[];
     step: 'user' | 'assistant';
   }[]>([]);
+
+  // Update conversation timestamps when content changes
+  useEffect(() => {
+    if (conversation.userQuery || conversation.assistantResponse) {
+      setConversation(prev => ({
+        ...prev,
+        updatedAt: new Date()
+      }));
+    }
+  }, [conversation.userQuery, conversation.assistantResponse]);
 
   // =============================================================================
   // API HOOKS
@@ -312,12 +325,12 @@ const ToolTrainer = () => {
     setConversation(prev => ({
       ...prev,
       id: example.id,
-      title: example.name,
-      messages: example.messages || []
+      userQuery: example.userQuery || '',
+      assistantResponse: example.assistantResponse || ''
     }));
     setExampleName(example.name);
     setDescription(example.description || '');
-    setConversationStarted(example.messages?.length > 0);
+    setConversationStarted(example.userQuery?.length > 0 || example.assistantResponse?.length > 0);
     
     // Reset current state
     setToolCalls([]);
@@ -335,7 +348,8 @@ const ToolTrainer = () => {
     setDescription(updatedExample.description || '');
     setConversation(prev => ({
       ...prev,
-      title: updatedExample.name
+      userQuery: updatedExample.userQuery || prev.userQuery,
+      assistantResponse: updatedExample.assistantResponse || prev.assistantResponse
     }));
     
     console.log('Example updated successfully:', updatedExample);
@@ -350,7 +364,8 @@ const ToolTrainer = () => {
     setConversationHistory(prev => [
       ...prev,
       {
-        messages: [...conversation.messages],
+        userQuery: conversation.userQuery,
+        assistantResponse: conversation.assistantResponse,
         toolCalls: [...toolCalls],
         step: currentStep
       }
@@ -380,17 +395,17 @@ const ToolTrainer = () => {
 
   const addTextChunk = () => {
     if (messageContent.trim()) {
-      const newMessage: Message = {
-        id: `msg_${Date.now()}`,
-        role: currentStep,
-        content: messageContent,
-        timestamp: new Date()
-      };
-      
-      setConversation(prev => ({
-        ...prev,
-        messages: [...prev.messages, newMessage]
-      }));
+      if (currentStep === 'user') {
+        setConversation(prev => ({
+          ...prev,
+          userQuery: messageContent
+        }));
+      } else {
+        setConversation(prev => ({
+          ...prev,
+          assistantResponse: messageContent
+        }));
+      }
       
       // Mark conversation as started when first message is added
       if (!conversationStarted) {
@@ -549,7 +564,8 @@ const ToolTrainer = () => {
       // Restore the conversation to the previous state
       setConversation(prev => ({
         ...prev,
-        messages: lastState.messages
+        userQuery: lastState.userQuery,
+        assistantResponse: lastState.assistantResponse
       }));
       setToolCalls(lastState.toolCalls);
       setCurrentStep(lastState.step);
@@ -565,7 +581,8 @@ const ToolTrainer = () => {
       // If no history, go back to initial state
       setConversation(prev => ({
         ...prev,
-        messages: []
+        userQuery: '',
+        assistantResponse: ''
       }));
       setToolCalls([]);
       setCurrentStep('user');
@@ -637,7 +654,7 @@ const ToolTrainer = () => {
   };
 
   const canGoBackStep = () => {
-    return conversationHistory.length > 0 || conversation.messages.length > 0;
+    return conversationHistory.length > 0 || conversation.userQuery || conversation.assistantResponse;
   };
 
   // =============================================================================
@@ -653,15 +670,16 @@ const ToolTrainer = () => {
     // TODO: Replace with proper type from backend
     setConversation({
       id: savedConversation.id,
-      title: savedConversation.name,
-      messages: savedConversation.messages,
-      toolCalls: [],
+      userQuery: savedConversation.userQuery || '',
+      assistantResponse: savedConversation.assistantResponse || '',
+      toolCalls: savedConversation.toolCalls || [],
+      tags: savedConversation.tags || [],
       createdAt: new Date(savedConversation.created_at),
       updatedAt: new Date(savedConversation.updated_at || savedConversation.created_at)
     });
     setExampleName(savedConversation.name);
     setDescription(savedConversation.description || '');
-    setConversationStarted(savedConversation.messages.length > 0);
+    setConversationStarted(savedConversation.userQuery?.length > 0 || savedConversation.assistantResponse?.length > 0);
   };
 
   // =============================================================================
@@ -687,7 +705,7 @@ const ToolTrainer = () => {
           <Button
             onClick={handleGetAllTools}
             disabled={toolsLoading}
-            className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white disabled:opacity-50 shadow-lg transition-all duration-200"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed shadow-lg transition-all duration-200 border-0"
           >
             {toolsLoading ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -748,7 +766,7 @@ const ToolTrainer = () => {
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="h-6 px-2 text-xs text-blue-300 hover:text-blue-200 hover:bg-blue-500/20"
+                            className="h-6 px-2 text-xs text-blue-300 hover:text-blue-200 hover:bg-blue-500/20 bg-transparent border-0"
                             onClick={() => copySignatureToClipboard(generatePythonSignature(tool.tool_name, func))}
                           >
                             Copy
@@ -796,14 +814,14 @@ const ToolTrainer = () => {
       <div className="flex-1 flex flex-col">
         {/* Top Navigation */}
         <div className="p-4 border-b border-gray-700/50 bg-gray-800/90 backdrop-blur shadow-lg">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Button
                 onClick={navigatePrevious}
                 disabled={currentExampleId <= 1}
                 variant="outline"
                 size="sm"
-                className="bg-gray-700/80 border-gray-600/50 text-white hover:bg-gray-600/80 hover:border-blue-400/50 transition-all duration-200"
+                className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 hover:border-blue-400 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
               >
                 <ChevronLeft className="w-4 h-4 mr-1" />
                 Previous
@@ -817,7 +835,7 @@ const ToolTrainer = () => {
                 onClick={navigateNext}
                 variant="outline"
                 size="sm"
-                className="bg-gray-700/80 border-gray-600/50 text-white hover:bg-gray-600/80 hover:border-blue-400/50 transition-all duration-200"
+                className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 hover:border-blue-400 font-medium"
               >
                 Next
                 <ChevronRight className="w-4 h-4 ml-1" />
@@ -825,69 +843,61 @@ const ToolTrainer = () => {
             </div>
             
             <div className="flex items-center gap-3">
+              {/* Saved Conversations Button */}
               <SavedConversations onLoadConversation={handleLoadConversation} />
-              <SaveConversationDialog 
-                messages={conversation.messages}
-                exampleName={exampleName}
-                onSaved={handleSaveConversation}
-              />
+              
+              
             </div>
           </div>
         </div>
 
-        {/* Training Example Header */}
-        <div className="p-6 border-b border-gray-700/50 bg-gradient-to-r from-gray-800/90 to-gray-700/90 backdrop-blur">
+        {/* Training Example Header - Made more compact */}
+        <div className="p-4 border-b border-gray-700/50 bg-gradient-to-r from-gray-800/90 to-gray-700/90 backdrop-blur">
           <Card className="bg-gradient-to-r from-gray-700/80 to-gray-600/80 border-gray-600/50 shadow-xl">
-            <CardHeader>
+            <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center text-xl text-white">
-                  <div className="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center mr-3">
-                    <FileText className="w-5 h-5 text-blue-400" />
+                <CardTitle className="flex items-center text-lg text-white">
+                  <div className="w-6 h-6 bg-blue-500/20 rounded-lg flex items-center justify-center mr-2">
+                    <FileText className="w-4 h-4 text-blue-400" />
                   </div>
                   Training Example
                 </CardTitle>
                 <div className="flex items-center gap-3">
                   {currentStep === 'user' ? (
-                    <div className="flex items-center gap-2 bg-blue-500/20 px-4 py-2 rounded-full border border-blue-400/50">
-                      <User className="w-5 h-5 text-blue-400" />
-                      <span className="font-medium text-blue-300">User Turn</span>
-                      <Badge variant="outline" className="bg-blue-600/30 text-blue-200 border-blue-400/50 ml-2">
-                        Current
-                      </Badge>
+                    <div className="flex items-center gap-2 bg-blue-500/20 px-3 py-1 rounded-full border border-blue-400/50">
+                      <User className="w-4 h-4 text-blue-400" />
+                      <span className="font-medium text-blue-300 text-sm">User Turn</span>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2 bg-green-500/20 px-4 py-2 rounded-full border border-green-400/50">
-                      <Bot className="w-5 h-5 text-green-400" />
-                      <span className="font-medium text-green-300">Assistant Turn</span>
-                      <Badge variant="outline" className="bg-green-600/30 text-green-200 border-green-400/50 ml-2">
-                        Current
-                      </Badge>
+                    <div className="flex items-center gap-2 bg-green-500/20 px-3 py-1 rounded-full border border-green-400/50">
+                      <Bot className="w-4 h-4 text-green-400" />
+                      <span className="font-medium text-green-300 text-sm">Assistant Turn</span>
                     </div>
                   )}
                 </div>
               </div>
             </CardHeader>
             
-            <CardContent className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="space-y-2">
+            <CardContent className="space-y-3 pt-0">
+              <div className="grid md:grid-cols-2 gap-3">
+                <div className="space-y-1">
                   <label className="text-sm font-medium text-gray-300">Example Name</label>
                   <Input
                     value={exampleName}
                     onChange={(e) => setExampleName(e.target.value)}
                     placeholder="Enter example name..."
-                    className="bg-gray-600/80 border-gray-500/50 text-white placeholder:text-gray-400 focus:border-blue-400/50 transition-colors"
+                    className="bg-gray-600/80 border-gray-500/50 text-white placeholder:text-gray-400 focus:border-blue-400/50 transition-colors h-8"
                   />
                 </div>
                 
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <label className="text-sm font-medium text-gray-300">Tags</label>
-                  <div className="flex flex-wrap gap-2 items-center">
+                  <div className="flex flex-wrap gap-1 items-center">
                     {tags.map((tag, index) => (
                       <Badge 
                         key={index} 
                         variant="secondary" 
-                        className="cursor-pointer hover:bg-red-500/30 bg-gray-600/80 text-white border border-gray-500/30 hover:border-red-400/50 transition-all duration-200"
+                        className="cursor-pointer hover:bg-red-500/30 bg-gray-600/80 text-white border border-gray-500/30 hover:border-red-400/50 transition-all duration-200 text-xs px-2 py-0"
                         onClick={() => removeTag(tag)}
                       >
                         {tag} ×
@@ -902,34 +912,34 @@ const ToolTrainer = () => {
                         }
                       }}
                       placeholder="Add tag..."
-                      className="w-32 h-8 text-xs bg-gray-600/80 border-gray-500/50 text-white placeholder:text-gray-400 focus:border-blue-400/50 transition-colors"
+                      className="w-24 h-6 text-xs bg-gray-600/80 border-gray-500/50 text-white placeholder:text-gray-400 focus:border-blue-400/50 transition-colors"
                     />
                   </div>
                 </div>
               </div>
               
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <label className="text-sm font-medium text-gray-300">Description</label>
                 <Textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Describe what this training example demonstrates..."
-                  className="min-h-[60px] bg-gray-600/80 border-gray-500/50 text-white placeholder:text-gray-400 focus:border-blue-400/50 transition-colors"
+                  className="min-h-[50px] bg-gray-600/80 border-gray-500/50 text-white placeholder:text-gray-400 focus:border-blue-400/50 transition-colors"
                 />
               </div>
               
-              <div className="flex items-center gap-4 text-sm text-gray-400">
-                <div className="flex items-center bg-gray-700/50 px-3 py-1 rounded-full">
-                  <Calendar className="w-4 h-4 mr-1" />
-                  Created: 6/14/2025
+              <div className="flex items-center gap-4 text-xs text-gray-400">
+                <div className="flex items-center bg-gray-700/50 px-2 py-1 rounded-full">
+                  <Calendar className="w-3 h-3 mr-1" />
+                  Created: {conversation.createdAt.toLocaleDateString()}
                 </div>
-                <div className="flex items-center bg-gray-700/50 px-3 py-1 rounded-full">
-                  <Clock className="w-4 h-4 mr-1" />
-                  Updated: 6/14/2025
+                <div className="flex items-center bg-gray-700/50 px-2 py-1 rounded-full">
+                  <Clock className="w-3 h-3 mr-1" />
+                  Updated: {conversation.updatedAt.toLocaleDateString()}
                 </div>
-                <Badge variant="outline" className="border-gray-500/50 text-gray-300 bg-gray-700/30">
+                <Badge variant="outline" className="border-gray-500/50 text-gray-300 bg-gray-700/30 text-xs px-2 py-0">
                   <MessageSquare className="w-3 h-3 mr-1" />
-                  {conversation.messages.length} message{conversation.messages.length !== 1 ? 's' : ''}
+                  {(conversation.userQuery ? 1 : 0) + (conversation.assistantResponse ? 1 : 0)} message{((conversation.userQuery ? 1 : 0) + (conversation.assistantResponse ? 1 : 0)) !== 1 ? 's' : ''}
                 </Badge>
               </div>
             </CardContent>
@@ -1049,7 +1059,7 @@ const ToolTrainer = () => {
           
           {/* Conversation Messages */}
           <ScrollArea className="flex-1 p-6">
-            {conversation.messages.length === 0 ? (
+            {!conversation.userQuery && !conversation.assistantResponse ? (
               <div className="flex items-center justify-center h-full text-gray-400">
                 <div className="text-center">
                   <div className="w-24 h-24 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -1067,35 +1077,42 @@ const ToolTrainer = () => {
               </div>
             ) : (
               <div className="space-y-6">
-                {conversation.messages.map((message, index) => (
-                  <div key={message.id} className="flex flex-col space-y-3">
-                    <div className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[85%] rounded-2xl p-4 shadow-lg ${
-                        message.role === 'user' 
-                          ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white' 
-                          : 'bg-gradient-to-r from-gray-700 to-gray-600 text-white border border-gray-500/30'
-                      }`}>
+                {conversation.userQuery && (
+                  <div className="flex justify-end">
+                    <div className="max-w-[85%] rounded-2xl p-4 shadow-lg bg-gradient-to-r from-blue-600 to-blue-500 text-white">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-6 h-6 rounded-full flex items-center justify-center bg-blue-400/30">
+                          <User className="w-4 h-4" />
+                        </div>
+                        <span className="font-medium capitalize text-sm">User</span>
+                        <span className="text-xs opacity-70 bg-black/20 px-2 py-1 rounded-full">
+                          {new Date().toLocaleTimeString()}
+                        </span>
+                      </div>
+                      <p className="whitespace-pre-wrap leading-relaxed">{conversation.userQuery}</p>
+                    </div>
+                  </div>
+                )}
+                
+                {conversation.assistantResponse && (
+                  <div className="flex flex-col space-y-3">
+                    <div className="flex justify-start">
+                      <div className="max-w-[85%] rounded-2xl p-4 shadow-lg bg-gradient-to-r from-gray-700 to-gray-600 text-white border border-gray-500/30">
                         <div className="flex items-center gap-2 mb-3">
-                          <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                            message.role === 'user' ? 'bg-blue-400/30' : 'bg-gray-500/30'
-                          }`}>
-                            {message.role === 'user' ? (
-                              <User className="w-4 h-4" />
-                            ) : (
-                              <Bot className="w-4 h-4" />
-                            )}
+                          <div className="w-6 h-6 rounded-full flex items-center justify-center bg-gray-500/30">
+                            <Bot className="w-4 h-4" />
                           </div>
-                          <span className="font-medium capitalize text-sm">{message.role}</span>
+                          <span className="font-medium capitalize text-sm">Assistant</span>
                           <span className="text-xs opacity-70 bg-black/20 px-2 py-1 rounded-full">
-                            {message.timestamp.toLocaleTimeString()}
+                            {new Date().toLocaleTimeString()}
                           </span>
                         </div>
-                        <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                        <p className="whitespace-pre-wrap leading-relaxed">{conversation.assistantResponse}</p>
                       </div>
                     </div>
                     
                     {/* Show tool calls for assistant messages */}
-                    {message.role === 'assistant' && index === conversation.messages.length - 1 && toolCalls.length > 0 && (
+                    {toolCalls.length > 0 && (
                       <div className="ml-8 space-y-3">
                         {toolCalls.map((toolCall) => (
                           <div key={toolCall.id} className="bg-gradient-to-r from-gray-800/80 to-gray-700/80 rounded-xl p-4 border border-gray-600/50 shadow-lg">
@@ -1135,7 +1152,7 @@ const ToolTrainer = () => {
                       </div>
                     )}
                   </div>
-                ))}
+                )}
               </div>
             )}
           </ScrollArea>
@@ -1316,7 +1333,7 @@ const ToolTrainer = () => {
             <Button 
               onClick={addNewTurn}
               disabled={!canStartNewTurn()}
-              className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white disabled:opacity-50 shadow-lg transition-all duration-200 px-6 h-11"
+              className="bg-blue-600 hover:bg-blue-700 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed shadow-lg transition-all duration-200 px-6 h-11 border-0"
             >
               <Plus className="w-4 h-4 mr-2" />
               New Turn
@@ -1327,7 +1344,7 @@ const ToolTrainer = () => {
               onClick={showTextChunkEditor}
               disabled={!canAddTextChunk() || showTextChunkInput}
               variant="outline"
-              className="bg-gray-700/80 border-gray-600/50 text-white hover:bg-gray-600/80 hover:border-blue-400/50 disabled:opacity-50 shadow-lg transition-all duration-200 px-6 h-11"
+              className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 hover:border-blue-400 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg transition-all duration-200 px-6 h-11 font-medium border-0"
             >
               <FileText className="w-4 h-4 mr-2" />
               Add Text Chunk
@@ -1339,7 +1356,7 @@ const ToolTrainer = () => {
                 onClick={addToolCall}
                 disabled={!canAddToolCall()}
                 variant="outline"
-                className="bg-green-500/20 border-green-400/50 text-green-300 hover:bg-green-500/30 hover:border-green-400 disabled:opacity-50 shadow-lg transition-all duration-200 px-6 h-11"
+                className="bg-green-700 border-green-600 text-green-300 hover:bg-green-600 hover:border-green-400 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg transition-all duration-200 px-6 h-11 font-medium border-0"
               >
                 <Settings className="w-4 h-4 mr-2" />
                 Add Tool Call
@@ -1351,7 +1368,7 @@ const ToolTrainer = () => {
               <Button 
                 onClick={executeAllToolCalls}
                 disabled={executeAllToolsMutation.isPending}
-                className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white shadow-lg transition-all duration-200 px-6 h-11"
+                className="bg-green-600 hover:bg-green-700 text-white font-medium shadow-lg transition-all duration-200 px-6 h-11 border-0"
               >
                 {executeAllToolsMutation.isPending ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -1367,7 +1384,7 @@ const ToolTrainer = () => {
               onClick={goBackStep}
               disabled={!canGoBackStep()}
               variant="outline" 
-              className="bg-gray-700/80 border-gray-600/50 text-white hover:bg-gray-600/80 hover:border-blue-400/50 disabled:opacity-50 shadow-lg transition-all duration-200 px-6 h-11"
+              className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 hover:border-blue-400 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg transition-all duration-200 px-6 h-11 font-medium border-0"
             >
               <Undo className="w-4 h-4 mr-2" />
               Back Step
@@ -1377,41 +1394,44 @@ const ToolTrainer = () => {
             <Button 
               onClick={goBack}
               variant="outline" 
-              className="bg-gray-700/80 border-gray-600/50 text-white hover:bg-gray-600/80 hover:border-blue-400/50 shadow-lg transition-all duration-200 px-6 h-11"
+              className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 hover:border-blue-400 shadow-lg transition-all duration-200 px-6 h-11 font-medium border-0"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back
             </Button>
 
             {/* Save to Database Button */}
-            <SaveToDatabase
-              messages={conversation.messages}
-              exampleName={exampleName}
-              description={description}
-            />
+            <div className="bg-purple-600 hover:bg-purple-700 rounded-md shadow-lg transition-all duration-200">
+              <SaveToDatabase
+                userQuery={conversation.userQuery}
+                assistantResponse={conversation.assistantResponse}
+                toolCalls={conversation.toolCalls}
+                tags={conversation.tags}
+                
+              />
+            </div>
 
             {/* Retrieve Example Button */}
-            <RetrieveExample
-              onExampleRetrieved={handleExampleRetrieved}
-            />
+            <div className="bg-indigo-600 hover:bg-indigo-700 rounded-md shadow-lg transition-all duration-200">
+              <RetrieveExample
+                onExampleRetrieved={handleExampleRetrieved}
+              />
+            </div>
 
             {/* Edit Example Button */}
-            <EditExample
-              currentExample={{
-                id: conversation.id,
-                name: exampleName,
-                description: description,
-                messages: conversation.messages
-              }}
-              onExampleUpdated={handleExampleUpdated}
-            />
-
-            {/* Save Conversation Button - Using the existing SaveConversationDialog */}
-            <SaveConversationDialog 
-              messages={conversation.messages}
-              exampleName={exampleName}
-              onSaved={handleSaveConversation}
-            />
+            <div className="bg-orange-600 hover:bg-orange-700 rounded-md shadow-lg transition-all duration-200">
+              <EditExample
+                currentExample={{
+                  id: conversation.id,
+                  name: exampleName,
+                  description: description,
+                  userQuery: conversation.userQuery,
+                  assistantResponse: conversation.assistantResponse,
+                  toolCalls: conversation.toolCalls
+                }}
+                onExampleUpdated={handleExampleUpdated}
+              />
+            </div>
           </div>
 
           {/* Status messages */}

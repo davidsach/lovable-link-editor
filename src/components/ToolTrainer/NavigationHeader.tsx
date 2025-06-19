@@ -49,7 +49,9 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
       <div className="flex items-center gap-3">
         <SavedConversations onLoadConversation={onLoadConversation} />
         <SaveConversationDialog 
-          messages={currentExample.messages}
+          userQuery={currentExample.userQuery}
+          assistantResponse={currentExample.assistantResponse}
+          toolCalls={currentExample.toolCalls}
           exampleName={currentExample.name}
         />
       </div>
