@@ -22,7 +22,7 @@ class ConversationService {
     const saved = this.getSavedConversations();
     const newConversation: SavedConversation = {
       ...conversation,
-      id: `conv_${Date.now()}`,
+      id: Date.now(), // Use number instead of string
       created_at: new Date().toISOString()
     };
     
@@ -43,7 +43,7 @@ class ConversationService {
   }
 
   // Delete a saved conversation
-  deleteConversation(id: string): void {
+  deleteConversation(id: number): void { // Use number instead of string
     const saved = this.getSavedConversations();
     const filtered = saved.filter(conv => conv.id !== id);
     localStorage.setItem(this.STORAGE_KEY, JSON.stringify(filtered));

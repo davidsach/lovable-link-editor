@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,16 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Trash2, Download, Calendar, MessageSquare } from 'lucide-react';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
-
-interface SavedConversation {
-  id: number;
-  user_query: string;
-  assistant_response: string;
-  tool_calls: any[];
-  tags?: string[];
-  created_at: string;
-  updated_at: string;
-}
+import { SavedConversation } from '../../types/toolTrainer';
 
 interface SavedConversationsProps {
   onLoadConversation: (conversation: SavedConversation) => void;

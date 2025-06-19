@@ -50,7 +50,7 @@ export const toolsApi = {
       throw new Error('Tool name is required');
     }
     
-    const schema = await apiClient.get<ToolSchema>(ENDPOINTS.TOOLS.SCHEMA(toolName));
+    const schema = await apiClient.get<ToolSchema>(ENDPOINTS.TOOLS.GET_SCHEMA(toolName));
     console.log(`✅ Retrieved schema for tool: ${toolName}`);
     return schema;
   },
@@ -68,7 +68,7 @@ export const toolsApi = {
     }
     
     const result = await apiClient.post<ToolExecuteResponse>(
-      ENDPOINTS.TOOLS.EXECUTE, 
+      '/execute_tool', 
       request
     );
     
@@ -93,7 +93,7 @@ export const toolsApi = {
     }
     
     const result = await apiClient.post<ExecuteToolResponse>(
-      ENDPOINTS.TOOLS.EXECUTE_RESULT, 
+      '/execute_tool_result', 
       request
     );
     
@@ -114,7 +114,7 @@ export const toolsApi = {
     }
     
     const result = await apiClient.post<ExecuteAllToolsResponse>(
-      ENDPOINTS.TOOLS.EXECUTE_ALL, 
+      '/execute_all_tools', 
       request
     );
     
