@@ -68,7 +68,7 @@ export const toolsApi = {
     }
     
     const result = await apiClient.post<ToolExecuteResponse>(
-      '/execute_tool', 
+      '/execute_tool_result', 
       request
     );
     
