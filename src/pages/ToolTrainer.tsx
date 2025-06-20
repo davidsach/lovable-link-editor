@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,7 +25,7 @@ import { useToast } from '@/hooks/use-toast';
 import { RetrieveExample } from '@/components/ToolTrainer/RetrieveExample';
 import { EditExample } from '@/components/ToolTrainer/EditExample';
 import { SaveToDatabase } from '@/components/ToolTrainer/SaveToDatabase';
-import MessageRenderer from '@/components/ToolTrainer/MessageRenderer';
+import { MessageRenderer } from '@/components/ToolTrainer/MessageRenderer';
 import { Example, Content, Tool } from '@/types/toolTrainer';
 import { apiService } from '@/services/api';
 

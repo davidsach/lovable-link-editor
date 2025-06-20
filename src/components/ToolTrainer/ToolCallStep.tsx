@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { AlertTriangle, Play, Trash2, Loader2, CheckCircle } from 'lucide-react';
-import { useToolSchema, useExecuteToolResult } from '@/hooks/useApi';
+import { useToolSchema, useExecuteTool } from '@/hooks/useApi';
 import { Tool } from '@/services/api';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -39,7 +40,7 @@ export const ToolCallStep: React.FC<ToolCallStepProps> = ({
   hasErrors = false
 }) => {
   const { data: toolSchema, isLoading: schemaLoading } = useToolSchema(toolName);
-  const executeToolMutation = useExecuteToolResult();
+  const executeToolMutation = useExecuteTool();
   const [localParameters, setLocalParameters] = useState(parameters);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
@@ -84,15 +85,16 @@ export const ToolCallStep: React.FC<ToolCallStepProps> = ({
     
     try {
       const result = await executeToolMutation.mutateAsync({
-        code: `# Tool: ${toolName}\n# Parameters: ${JSON.stringify(localParameters)}\nprint("Tool executed successfully")`
+        tool_name: toolName,
+        parameters: localParameters
       });
       
       // Safely handle the result
       let formattedResult: string;
-      if (result && typeof result === 'object' && 'code_output' in result) {
-        formattedResult = typeof result.code_output === 'object' 
-          ? JSON.stringify(result.code_output, null, 2)
-          : String(result.code_output);
+      if (result && typeof result === 'object' && 'result' in result) {
+        formattedResult = typeof result.result === 'object' 
+          ? JSON.stringify(result.result, null, 2)
+          : String(result.result);
       } else {
         formattedResult = typeof result === 'object' 
           ? JSON.stringify(result, null, 2)
