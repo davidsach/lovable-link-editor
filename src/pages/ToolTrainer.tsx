@@ -196,6 +196,7 @@ const ToolTrainer = () => {
     createdAt: new Date(),
     updatedAt: new Date()
   });
+  
 
   // Form fields
   const [exampleName, setExampleName] = useState('Example 1');
@@ -227,6 +228,33 @@ const ToolTrainer = () => {
     toolCalls: ToolCall[];
     step: 'user' | 'assistant';
   }[]>([]);
+
+  
+
+// Synchronize conversation.toolCalls with toolCalls state
+useEffect(() => {
+  setConversation(prev => ({
+    ...prev,
+    toolCalls: toolCalls
+  }));
+}, [toolCalls]);
+
+// Auto-generate assistantResponse when toolCalls complete
+useEffect(() => {
+  const completedToolCalls = toolCalls.filter(tc => tc.status === 'completed' && tc.result);
+  if (completedToolCalls.length > 0 && !conversation.assistantResponse) {
+    const generatedResponse = completedToolCalls.map(tc => {
+      const params = JSON.stringify(tc.parameters, null, 2);
+      const result = typeof tc.result === 'string' ? tc.result : JSON.stringify(tc.result, null, 2);
+      return `Tool: ${tc.toolName}\nParameters: ${params}\nResult: ${result}`;
+    }).join('\n\n');
+    setConversation(prev => ({
+      ...prev,
+      assistantResponse: generatedResponse
+    }));
+  }
+}, [toolCalls, conversation.assistantResponse]);
+
 
   // Update conversation timestamps when content changes
   useEffect(() => {
@@ -1405,7 +1433,7 @@ const ToolTrainer = () => {
               <SaveToDatabase
                 userQuery={conversation.userQuery}
                 assistantResponse={conversation.assistantResponse}
-                toolCalls={conversation.toolCalls}
+                toolCalls={toolCalls}
                 tags={conversation.tags}
                 
               />

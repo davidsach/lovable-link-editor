@@ -12,7 +12,7 @@ export interface ToolCall {
   parameters: Record<string, any>;
   result: any;
   status: 'pending' | 'executing' | 'completed' | 'failed';
-  timestamp: Date;
+  timestamp?: Date;
 }
 
 export interface ConversationState {
