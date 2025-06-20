@@ -6,20 +6,16 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Save, Loader2 } from 'lucide-react';
-import { ToolCall } from '../../types/toolTrainer';
+import { Content } from '../../types/toolTrainer';
 
 interface SaveToDatabaseProps {
-  userQuery: string;
-  assistantResponse: string;
-  toolCalls: ToolCall[];
+  messages: Content[];
   tags?: string[];
   exampleName?: string;
 }
 
 export const SaveToDatabase: React.FC<SaveToDatabaseProps> = ({
-  userQuery,
-  assistantResponse,
-  toolCalls,
+  messages = [],
   tags = [],
   exampleName = ''
 }) => {
@@ -29,41 +25,23 @@ export const SaveToDatabase: React.FC<SaveToDatabaseProps> = ({
   const [description, setDescription] = useState('');
   const [localTags, setLocalTags] = useState(tags);
 
-  // Generate assistant response from tool calls if empty
-  const generateAssistantResponse = () => {
-    if (assistantResponse && assistantResponse.trim()) {
-      return assistantResponse;
-    }
-    
-    // If no assistant response, generate one from tool calls
-    if (toolCalls && toolCalls.length > 0) {
-      return toolCalls.map(call => {
-        const params = JSON.stringify(call.parameters, null, 2);
-        const result = typeof call.result === 'string' ? call.result : JSON.stringify(call.result, null, 2);
-        return `Tool: ${call.toolName}\nParameters: ${params}\nResult: ${result}`;
-      }).join('\n\n');
-    }
-    
-    return 'No assistant response provided';
-  };
-
   const handleSave = async () => {
     setIsSaving(true);
 
     try {
-      const finalAssistantResponse = generateAssistantResponse();
-      
-      // Prepare the payload to match your database schema exactly
+      // Prepare the payload to match the new backend structure
       const payload = {
         name: name || `Example ${Date.now()}`,
         description: description || '',
-        user_query: userQuery,
-        assistant_response: finalAssistantResponse,
-        tool_calls: toolCalls || [],
-        tags: localTags
+        messages: messages,
+        meta: {
+          tags: localTags,
+          created_by: 'user',
+          source: 'tool_trainer'
+        }
       };
 
-      console.log('Saving to database with payload:', payload);
+      console.log('Saving to database with new structure:', payload);
 
       const response = await fetch('http://127.0.0.1:8000/examples/', {
         method: 'POST',
@@ -77,7 +55,7 @@ export const SaveToDatabase: React.FC<SaveToDatabaseProps> = ({
       }
 
       const savedExample = await response.json();
-      console.log('Example saved successfully:', savedExample);
+      console.log('Example saved successfully with new structure:', savedExample);
       setIsOpen(false);
       
       // Reset form
@@ -114,7 +92,7 @@ export const SaveToDatabase: React.FC<SaveToDatabaseProps> = ({
 
         <div id="save-to-db-description" className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="example_name" className="text-gray-300">Example Name</Label>
+            <Label htmlFor="example_name" className="text-gray-300">Example Name (Required)</Label>
             <Input
               id="example_name"
               value={name}
@@ -136,23 +114,18 @@ export const SaveToDatabase: React.FC<SaveToDatabaseProps> = ({
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="user_query" className="text-gray-300">User Query</Label>
-            <Textarea
-              id="user_query"
-              value={userQuery}
-              readOnly
-              className="bg-gray-700 border-gray-600 text-white min-h-[60px]"
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="assistant_response" className="text-gray-300">Assistant Response</Label>
-            <Textarea
-              id="assistant_response"
-              value={generateAssistantResponse()}
-              readOnly
-              className="bg-gray-700 border-gray-600 text-white min-h-[80px]"
-            />
+            <Label htmlFor="messages_preview" className="text-gray-300">Messages ({messages.length})</Label>
+            <div className="bg-gray-700 border border-gray-600 rounded p-3 max-h-32 overflow-y-auto">
+              {messages.length > 0 ? (
+                messages.map((msg, idx) => (
+                  <div key={idx} className="text-xs text-gray-300 mb-1">
+                    <span className="font-medium text-purple-400">{msg.kind}:</span> {msg.content.substring(0, 100)}...
+                  </div>
+                ))
+              ) : (
+                <span className="text-gray-500">No messages to save</span>
+              )}
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -169,7 +142,7 @@ export const SaveToDatabase: React.FC<SaveToDatabaseProps> = ({
           <div className="flex gap-3 pt-4">
             <Button
               onClick={handleSave}
-              disabled={isSaving || !userQuery.trim()}
+              disabled={isSaving || !name.trim() || messages.length === 0}
               className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
             >
               {isSaving ? (

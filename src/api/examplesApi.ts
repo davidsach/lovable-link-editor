@@ -1,12 +1,13 @@
+
 /**
  * Examples API Functions
- * All training example-related API operations
+ * All example-related API operations using new Content-based structure
  */
 
 import { apiClient } from './client';
 import { ENDPOINTS } from './endpoints';
 import { 
-  TrainingExample, 
+  Example, 
   CreateExampleRequest, 
   UpdateExampleRequest,
   ApiResponse 
@@ -23,90 +24,94 @@ export const examplesApi = {
   // ---------------------------------------------------------------------------
 
   /**
-   * Get all training examples
-   * @returns Promise<TrainingExample[]> - Array of training examples
+   * Get all examples
+   * @returns Promise<Example[]> - Array of examples
    */
-  async getExamples(): Promise<TrainingExample[]> {
-    console.log('📚 Fetching all training examples...');
-    const examples = await apiClient.get<TrainingExample[]>(ENDPOINTS.EXAMPLES.LIST);
-    console.log(`✅ Retrieved ${examples.length} training examples`);
+  async getExamples(): Promise<Example[]> {
+    console.log('📚 Fetching all examples...');
+    const examples = await apiClient.get<Example[]>(ENDPOINTS.EXAMPLES.LIST);
+    console.log(`✅ Retrieved ${examples.length} examples`);
     return examples;
   },
 
   /**
-   * Get a specific training example
+   * Get a specific example
    * @param id - ID of the example to retrieve
-   * @returns Promise<TrainingExample> - Training example data
+   * @returns Promise<Example> - Example data
    */
-  async getExample(id: string): Promise<TrainingExample> {
-    console.log('📖 Fetching training example:', id);
+  async getExample(id: string): Promise<Example> {
+    console.log('📖 Fetching example:', id);
     
     if (!id || id.trim() === '') {
       throw new Error('Example ID is required');
     }
     
-    const example = await apiClient.get<TrainingExample>(ENDPOINTS.EXAMPLES.GET(id));
-    console.log(`✅ Retrieved training example: ${example.user_query}`);
+    const example = await apiClient.get<Example>(ENDPOINTS.EXAMPLES.GET(id));
+    console.log(`✅ Retrieved example: ${example.name}`);
     return example;
   },
 
   /**
-   * Create a new training example
-   * @param example - Training example data to create
-   * @returns Promise<ApiResponse<TrainingExample>> - Creation result
+   * Create a new example
+   * @param example - Example data to create
+   * @returns Promise<ApiResponse<Example>> - Creation result
    */
-  async createExample(example: CreateExampleRequest): Promise<ApiResponse<TrainingExample>> {
-    console.log('📝 Creating new training example:', example.user_query);
+  async createExample(example: CreateExampleRequest): Promise<ApiResponse<Example>> {
+    console.log('📝 Creating new example:', example.name);
     
-    if (!example.user_query || example.user_query.trim() === '') {
-      throw new Error('Example user_query is required');
+    if (!example.name || example.name.trim() === '') {
+      throw new Error('Example name is required');
     }
     
-    const result = await apiClient.post<ApiResponse<TrainingExample>>(
+    if (!example.messages || example.messages.length === 0) {
+      throw new Error('Example messages are required');
+    }
+    
+    const result = await apiClient.post<ApiResponse<Example>>(
       ENDPOINTS.EXAMPLES.CREATE, 
       example
     );
     
-    console.log(`✅ Training example created successfully: ${example.user_query}`);
+    console.log(`✅ Example created successfully: ${example.name}`);
     return result;
   },
 
   /**
-   * Update an existing training example
+   * Update an existing example
    * @param id - ID of the example to update
-   * @param example - Updated training example data
-   * @returns Promise<ApiResponse<TrainingExample>> - Update result
+   * @param example - Updated example data
+   * @returns Promise<ApiResponse<Example>> - Update result
    */
-  async updateExample(id: string, example: UpdateExampleRequest): Promise<ApiResponse<TrainingExample>> {
-    console.log('📝 Updating training example:', id);
+  async updateExample(id: string, example: UpdateExampleRequest): Promise<ApiResponse<Example>> {
+    console.log('📝 Updating example:', id);
     
     if (!id || id.trim() === '') {
       throw new Error('Example ID is required');
     }
     
-    const result = await apiClient.put<ApiResponse<TrainingExample>>(
+    const result = await apiClient.put<ApiResponse<Example>>(
       ENDPOINTS.EXAMPLES.UPDATE(id), 
       example
     );
     
-    console.log(`✅ Training example updated successfully: ${id}`);
+    console.log(`✅ Example updated successfully: ${id}`);
     return result;
   },
 
   /**
-   * Delete a training example
+   * Delete an example
    * @param id - ID of the example to delete
    * @returns Promise<ApiResponse<void>> - Deletion result
    */
   async deleteExample(id: string): Promise<ApiResponse<void>> {
-    console.log('🗑️ Deleting training example:', id);
+    console.log('🗑️ Deleting example:', id);
     
     if (!id || id.trim() === '') {
       throw new Error('Example ID is required');
     }
     
     const result = await apiClient.delete<ApiResponse<void>>(ENDPOINTS.EXAMPLES.DELETE(id));
-    console.log(`✅ Training example deleted successfully: ${id}`);
+    console.log(`✅ Example deleted successfully: ${id}`);
     return result;
   },
 

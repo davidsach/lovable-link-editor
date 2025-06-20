@@ -15,6 +15,37 @@ export interface ToolCall {
   timestamp?: Date;
 }
 
+// New Content interface for the messages array
+export interface Content {
+  kind: 'user' | 'assistant' | 'tool_call' | 'tool_result' | 'code' | 'text';
+  content: string;
+  metadata?: Record<string, any>;
+  timestamp?: string;
+}
+
+// Updated Example interface to match new backend structure
+export interface Example {
+  id: number;
+  name: string;
+  description?: string;
+  messages: Content[];
+  meta?: Record<string, any>;
+  created_at: string;
+  updated_at?: string;
+}
+
+// For creating new examples
+export interface CreateExampleRequest {
+  name: string;
+  description?: string;
+  messages: Content[];
+  meta?: Record<string, any>;
+}
+
+// For updating existing examples
+export interface UpdateExampleRequest extends Partial<CreateExampleRequest> {}
+
+// Legacy interfaces for backward compatibility during transition
 export interface ConversationState {
   id: string;
   userQuery: string;
@@ -38,45 +69,4 @@ export interface Tool {
       default_value: string;
     }>;
   }>;
-}
-
-// Updated to match your database schema exactly
-export interface TrainingExample {
-  id: number;
-  name?: string;
-  description?: string;
-  user_query: string;
-  assistant_response: string;
-  tool_calls: ToolCall[];
-  metadata: {
-    created_at: string;
-    updated_at: string;
-    tags: string[];
-  };
-}
-
-// Unified SavedConversation interface to match database schema
-export interface SavedConversation {
-  id: number;
-  name?: string;
-  description?: string;
-  user_query: string;
-  assistant_response: string;
-  tool_calls: ToolCall[];
-  tags: string[];
-  created_at: string;
-  updated_at?: string;
-}
-
-// For database operations - matches your exact schema
-export interface DatabaseExample {
-  id?: number;
-  name?: string;
-  description?: string;
-  user_query: string;
-  assistant_response: string;
-  tool_calls: any[];
-  tags?: string[];
-  created_at?: string;
-  updated_at?: string;
 }

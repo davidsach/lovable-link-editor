@@ -22,12 +22,57 @@ export interface ApiError {
 }
 
 // =============================================================================
+// CONTENT AND MESSAGE TYPES
+// =============================================================================
+
+/**
+ * Content object for the new messages structure
+ */
+export interface Content {
+  kind: 'user' | 'assistant' | 'tool_call' | 'tool_result' | 'code' | 'text';
+  content: string;
+  metadata?: Record<string, any>;
+  timestamp?: string;
+}
+
+// =============================================================================
+// EXAMPLE TYPES (NEW STRUCTURE)
+// =============================================================================
+
+/**
+ * Complete Example Definition (New Structure)
+ */
+export interface Example {
+  id: number;
+  name: string;
+  description?: string;
+  messages: Content[];
+  meta?: Record<string, any>;
+  created_at: string;
+  updated_at?: string;
+}
+
+/**
+ * Request to Create New Example
+ */
+export interface CreateExampleRequest {
+  name: string;
+  description?: string;
+  messages: Content[];
+  meta?: Record<string, any>;
+}
+
+/**
+ * Request to Update Existing Example
+ */
+export interface UpdateExampleRequest extends Partial<CreateExampleRequest> {}
+
+// =============================================================================
 // TOOL RELATED TYPES
 // =============================================================================
 
 /**
  * Tool Parameter Definition
- * Used to define parameters for tool functions
  */
 export interface ToolParameter {
   param_name: string;
@@ -38,7 +83,6 @@ export interface ToolParameter {
 
 /**
  * Tool Function Definition
- * Represents a function within a tool
  */
 export interface ToolFunction {
   func_name: string;
@@ -48,7 +92,6 @@ export interface ToolFunction {
 
 /**
  * Python Class Definition
- * Represents a Python class within a tool
  */
 export interface PythonClass {
   class_name: string;
@@ -57,40 +100,12 @@ export interface PythonClass {
 
 /**
  * Complete Tool Definition
- * Main tool structure containing functions and classes
  */
 export interface Tool {
   tool_name: string;
   description?: string;
   functions: ToolFunction[];
   classes: PythonClass[];
-}
-
-// =============================================================================
-// LEGACY TOOL TYPES (for backward compatibility)
-// =============================================================================
-
-export interface LegacyToolParameter {
-  name: string;
-  type: 'text' | 'number' | 'boolean';
-  description?: string;
-  required?: boolean;
-}
-
-export interface ToolSchema {
-  tool_name: string;
-  parameters: LegacyToolParameter[];
-}
-
-export interface ToolExecuteRequest {
-  tool_name: string;
-  parameters: Record<string, any>;
-}
-
-export interface ToolExecuteResponse {
-  status: string;
-  result: any;
-  error?: string;
 }
 
 // =============================================================================
@@ -142,54 +157,28 @@ export interface ExecuteAllToolsResponse {
 }
 
 // =============================================================================
-// TRAINING EXAMPLE TYPES
+// LEGACY TYPES (for backward compatibility)
 // =============================================================================
 
-/**
- * Single Training Step
- * Represents one step in a training conversation
- */
-export interface TrainingStep {
-  thought: string;
-  tool_name: string;
-  tool_params: Record<string, any>;
-  tool_result: string;
-}
-
-/**
- * Legacy Step Interface (for backward compatibility)
- */
-export interface Step extends TrainingStep {}
-
-/**
- * Complete Training Example
- * Represents a full conversation example for training
- */
-export interface TrainingExample {
-  id: string;
+export interface LegacyToolParameter {
   name: string;
-  description: string;
-  tags: string[];
-  user_query: string;
-  user_prompt: string;
-  steps: TrainingStep[];
-  created: string;
-  updated: string;
-}
-
-/**
- * Request to Create New Training Example
- */
-export interface CreateExampleRequest {
-  name?: string;
+  type: 'text' | 'number' | 'boolean';
   description?: string;
-  user_query: string;
-  assistant_response: string;
-  tool_calls: any[];
-  tags?: string[];
+  required?: boolean;
 }
 
-/**
- * Request to Update Existing Training Example
- */
-export interface UpdateExampleRequest extends Partial<CreateExampleRequest> {}
+export interface ToolSchema {
+  tool_name: string;
+  parameters: LegacyToolParameter[];
+}
+
+export interface ToolExecuteRequest {
+  tool_name: string;
+  parameters: Record<string, any>;
+}
+
+export interface ToolExecuteResponse {
+  status: string;
+  result: any;
+  error?: string;
+}
