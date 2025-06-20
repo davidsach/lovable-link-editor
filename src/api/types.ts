@@ -22,23 +22,6 @@ export interface ApiError {
 }
 
 // =============================================================================
-// CONTENT AND MESSAGE TYPES
-// =============================================================================
-
-/**
- * Content chunk for messages
- * Represents different types of content in a conversation
- */
-export interface Content {
-  kind: 'user' | 'assistant' | 'tool_call' | 'tool_result' | 'code' | 'text';
-  content: string | Record<string, any>;
-  tool_name?: string;
-  parameters?: Record<string, any>;
-  result?: any;
-  timestamp?: string;
-}
-
-// =============================================================================
 // TOOL RELATED TYPES
 // =============================================================================
 
@@ -159,50 +142,12 @@ export interface ExecuteAllToolsResponse {
 }
 
 // =============================================================================
-// EXAMPLE TYPES (NEW STRUCTURE)
+// TRAINING EXAMPLE TYPES
 // =============================================================================
 
 /**
- * Example with New Structure
- * Uses Content-based messages instead of separate fields
- */
-export interface Example {
-  id: number;
-  name: string;
-  description?: string;
-  messages: Content[];
-  meta?: {
-    tags?: string[];
-    [key: string]: any;
-  };
-  created_at: string;
-  updated_at: string;
-}
-
-/**
- * Request to Create New Example
- */
-export interface CreateExampleRequest {
-  name: string;
-  description?: string;
-  messages: Content[];
-  meta?: {
-    tags?: string[];
-    [key: string]: any;
-  };
-}
-
-/**
- * Request to Update Existing Example
- */
-export interface UpdateExampleRequest extends Partial<CreateExampleRequest> {}
-
-// =============================================================================
-// LEGACY TRAINING EXAMPLE TYPES (for backward compatibility)
-// =============================================================================
-
-/**
- * Single Training Step (DEPRECATED - use Content instead)
+ * Single Training Step
+ * Represents one step in a training conversation
  */
 export interface TrainingStep {
   thought: string;
@@ -212,12 +157,13 @@ export interface TrainingStep {
 }
 
 /**
- * Legacy Step Interface (DEPRECATED)
+ * Legacy Step Interface (for backward compatibility)
  */
 export interface Step extends TrainingStep {}
 
 /**
- * Legacy Training Example (DEPRECATED - use Example instead)
+ * Complete Training Example
+ * Represents a full conversation example for training
  */
 export interface TrainingExample {
   id: string;
@@ -230,3 +176,20 @@ export interface TrainingExample {
   created: string;
   updated: string;
 }
+
+/**
+ * Request to Create New Training Example
+ */
+export interface CreateExampleRequest {
+  name?: string;
+  description?: string;
+  user_query: string;
+  assistant_response: string;
+  tool_calls: any[];
+  tags?: string[];
+}
+
+/**
+ * Request to Update Existing Training Example
+ */
+export interface UpdateExampleRequest extends Partial<CreateExampleRequest> {}

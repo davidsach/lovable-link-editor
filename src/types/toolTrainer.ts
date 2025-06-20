@@ -40,45 +40,7 @@ export interface Tool {
   }>;
 }
 
-// New Content interface for message chunks
-export interface Content {
-  kind: 'user' | 'assistant' | 'tool_call' | 'tool_result' | 'code' | 'text';
-  content: string | Record<string, any>;
-  tool_name?: string;
-  parameters?: Record<string, any>;
-  result?: any;
-  timestamp?: string;
-}
-
-// Updated Example interface to match new backend structure
-export interface Example {
-  id: number;
-  name: string;
-  description?: string;
-  messages: Content[];
-  meta?: {
-    tags?: string[];
-    [key: string]: any;
-  };
-  created_at: string;
-  updated_at: string;
-}
-
-// For creating new examples
-export interface CreateExampleRequest {
-  name: string;
-  description?: string;
-  messages: Content[];
-  meta?: {
-    tags?: string[];
-    [key: string]: any;
-  };
-}
-
-// For updating existing examples
-export interface UpdateExampleRequest extends Partial<CreateExampleRequest> {}
-
-// Legacy interfaces for backward compatibility (deprecated)
+// Updated to match your database schema exactly
 export interface TrainingExample {
   id: number;
   name?: string;
@@ -93,6 +55,7 @@ export interface TrainingExample {
   };
 }
 
+// Unified SavedConversation interface to match database schema
 export interface SavedConversation {
   id: number;
   name?: string;
@@ -105,6 +68,7 @@ export interface SavedConversation {
   updated_at?: string;
 }
 
+// For database operations - matches your exact schema
 export interface DatabaseExample {
   id?: number;
   name?: string;

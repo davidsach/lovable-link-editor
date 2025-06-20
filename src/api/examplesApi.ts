@@ -1,4 +1,3 @@
-
 /**
  * Examples API Functions
  * All training example-related API operations
@@ -7,7 +6,7 @@
 import { apiClient } from './client';
 import { ENDPOINTS } from './endpoints';
 import { 
-  Example,
+  TrainingExample, 
   CreateExampleRequest, 
   UpdateExampleRequest,
   ApiResponse 
@@ -25,11 +24,11 @@ export const examplesApi = {
 
   /**
    * Get all training examples
-   * @returns Promise<Example[]> - Array of training examples
+   * @returns Promise<TrainingExample[]> - Array of training examples
    */
-  async getExamples(): Promise<Example[]> {
+  async getExamples(): Promise<TrainingExample[]> {
     console.log('📚 Fetching all training examples...');
-    const examples = await apiClient.get<Example[]>(ENDPOINTS.EXAMPLES.LIST);
+    const examples = await apiClient.get<TrainingExample[]>(ENDPOINTS.EXAMPLES.LIST);
     console.log(`✅ Retrieved ${examples.length} training examples`);
     return examples;
   },
@@ -37,42 +36,38 @@ export const examplesApi = {
   /**
    * Get a specific training example
    * @param id - ID of the example to retrieve
-   * @returns Promise<Example> - Training example data
+   * @returns Promise<TrainingExample> - Training example data
    */
-  async getExample(id: string | number): Promise<Example> {
+  async getExample(id: string): Promise<TrainingExample> {
     console.log('📖 Fetching training example:', id);
     
-    if (!id || (typeof id === 'string' && id.trim() === '')) {
+    if (!id || id.trim() === '') {
       throw new Error('Example ID is required');
     }
     
-    const example = await apiClient.get<Example>(ENDPOINTS.EXAMPLES.GET(id.toString()));
-    console.log(`✅ Retrieved training example: ${example.name}`);
+    const example = await apiClient.get<TrainingExample>(ENDPOINTS.EXAMPLES.GET(id));
+    console.log(`✅ Retrieved training example: ${example.user_query}`);
     return example;
   },
 
   /**
    * Create a new training example
    * @param example - Training example data to create
-   * @returns Promise<ApiResponse<Example>> - Creation result
+   * @returns Promise<ApiResponse<TrainingExample>> - Creation result
    */
-  async createExample(example: CreateExampleRequest): Promise<ApiResponse<Example>> {
-    console.log('📝 Creating new training example:', example.name);
+  async createExample(example: CreateExampleRequest): Promise<ApiResponse<TrainingExample>> {
+    console.log('📝 Creating new training example:', example.user_query);
     
-    if (!example.name || example.name.trim() === '') {
-      throw new Error('Example name is required');
+    if (!example.user_query || example.user_query.trim() === '') {
+      throw new Error('Example user_query is required');
     }
     
-    if (!example.messages || example.messages.length === 0) {
-      throw new Error('Example messages are required');
-    }
-    
-    const result = await apiClient.post<ApiResponse<Example>>(
+    const result = await apiClient.post<ApiResponse<TrainingExample>>(
       ENDPOINTS.EXAMPLES.CREATE, 
       example
     );
     
-    console.log(`✅ Training example created successfully: ${example.name}`);
+    console.log(`✅ Training example created successfully: ${example.user_query}`);
     return result;
   },
 
@@ -80,17 +75,17 @@ export const examplesApi = {
    * Update an existing training example
    * @param id - ID of the example to update
    * @param example - Updated training example data
-   * @returns Promise<ApiResponse<Example>> - Update result
+   * @returns Promise<ApiResponse<TrainingExample>> - Update result
    */
-  async updateExample(id: string | number, example: UpdateExampleRequest): Promise<ApiResponse<Example>> {
+  async updateExample(id: string, example: UpdateExampleRequest): Promise<ApiResponse<TrainingExample>> {
     console.log('📝 Updating training example:', id);
     
-    if (!id || (typeof id === 'string' && id.trim() === '')) {
+    if (!id || id.trim() === '') {
       throw new Error('Example ID is required');
     }
     
-    const result = await apiClient.put<ApiResponse<Example>>(
-      ENDPOINTS.EXAMPLES.UPDATE(id.toString()), 
+    const result = await apiClient.put<ApiResponse<TrainingExample>>(
+      ENDPOINTS.EXAMPLES.UPDATE(id), 
       example
     );
     
@@ -103,14 +98,14 @@ export const examplesApi = {
    * @param id - ID of the example to delete
    * @returns Promise<ApiResponse<void>> - Deletion result
    */
-  async deleteExample(id: string | number): Promise<ApiResponse<void>> {
+  async deleteExample(id: string): Promise<ApiResponse<void>> {
     console.log('🗑️ Deleting training example:', id);
     
-    if (!id || (typeof id === 'string' && id.trim() === '')) {
+    if (!id || id.trim() === '') {
       throw new Error('Example ID is required');
     }
     
-    const result = await apiClient.delete<ApiResponse<void>>(ENDPOINTS.EXAMPLES.DELETE(id.toString()));
+    const result = await apiClient.delete<ApiResponse<void>>(ENDPOINTS.EXAMPLES.DELETE(id));
     console.log(`✅ Training example deleted successfully: ${id}`);
     return result;
   },
