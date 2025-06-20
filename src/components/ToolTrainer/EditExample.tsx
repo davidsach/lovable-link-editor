@@ -6,11 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Edit, Loader2, Save } from 'lucide-react';
-import { DatabaseExample } from '../../types/toolTrainer';
+import { Example } from '../../types/toolTrainer';
 
 interface EditExampleProps {
-  currentExample: DatabaseExample;
-  onExampleUpdated: (updatedExample: DatabaseExample) => void;
+  currentExample: Example;
+  onExampleUpdated: (updatedExample: Example) => void;
 }
 
 export const EditExample: React.FC<EditExampleProps> = ({
@@ -21,9 +21,7 @@ export const EditExample: React.FC<EditExampleProps> = ({
   const [isUpdating, setIsUpdating] = useState(false);
   const [name, setName] = useState(currentExample.name || '');
   const [description, setDescription] = useState(currentExample.description || '');
-  const [userQuery, setUserQuery] = useState(currentExample.user_query || '');
-  const [assistantResponse, setAssistantResponse] = useState(currentExample.assistant_response || '');
-  const [tags, setTags] = useState(currentExample.tags?.join(', ') || '');
+  const [tags, setTags] = useState(currentExample.meta?.tags?.join(', ') || '');
 
   const handleUpdate = async () => {
     if (!currentExample.id) {
@@ -37,9 +35,11 @@ export const EditExample: React.FC<EditExampleProps> = ({
       const updatedData = {
         name: name.trim() || `Example ${currentExample.id}`,
         description: description.trim(),
-        user_query: userQuery.trim(),
-        assistant_response: assistantResponse.trim(),
-        tags: tags.split(',').map(tag => tag.trim()).filter(tag => tag)
+        messages: currentExample.messages,
+        meta: {
+          ...currentExample.meta,
+          tags: tags.split(',').map(tag => tag.trim()).filter(tag => tag)
+        }
       };
       
       console.log('Updating example:', currentExample.id, updatedData);
@@ -75,9 +75,7 @@ export const EditExample: React.FC<EditExampleProps> = ({
     if (open) {
       setName(currentExample.name || '');
       setDescription(currentExample.description || '');
-      setUserQuery(currentExample.user_query || '');
-      setAssistantResponse(currentExample.assistant_response || '');
-      setTags(currentExample.tags?.join(', ') || '');
+      setTags(currentExample.meta?.tags?.join(', ') || '');
     }
   };
 
@@ -104,7 +102,7 @@ export const EditExample: React.FC<EditExampleProps> = ({
             <div className="text-xs text-gray-400">
               • ID: {currentExample.id || 'New Example'}
               • Created: {currentExample.created_at ? new Date(currentExample.created_at).toLocaleDateString() : 'Unknown'}
-              • Tool Calls: {currentExample.tool_calls?.length || 0}
+              • Messages: {currentExample.messages?.length || 0}
             </div>
           </div>
           
@@ -131,28 +129,6 @@ export const EditExample: React.FC<EditExampleProps> = ({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="editUserQuery" className="text-gray-300">User Query</Label>
-            <Textarea
-              id="editUserQuery"
-              value={userQuery}
-              onChange={(e) => setUserQuery(e.target.value)}
-              placeholder="Enter user query..."
-              className="bg-gray-700 border-gray-600 text-white min-h-[80px]"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="editAssistantResponse" className="text-gray-300">Assistant Response</Label>
-            <Textarea
-              id="editAssistantResponse"
-              value={assistantResponse}
-              onChange={(e) => setAssistantResponse(e.target.value)}
-              placeholder="Enter assistant response..."
-              className="bg-gray-700 border-gray-600 text-white min-h-[100px]"
-            />
-          </div>
-
-          <div className="space-y-2">
             <Label htmlFor="editTags" className="text-gray-300">Tags (comma separated)</Label>
             <Input
               id="editTags"
@@ -166,7 +142,7 @@ export const EditExample: React.FC<EditExampleProps> = ({
           <div className="flex gap-3 pt-4">
             <Button
               onClick={handleUpdate}
-              disabled={!userQuery.trim() || isUpdating}
+              disabled={!name.trim() || isUpdating}
               className="flex-1 bg-orange-600 hover:bg-orange-700 text-white"
             >
               {isUpdating ? (

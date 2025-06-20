@@ -9,7 +9,6 @@ import {
   toolsApi,
   examplesApi,
   CreateExampleRequest,
-  ToolExecuteRequest,
   ExecuteToolRequest,
   ExecuteAllToolsRequest
 } from '../api';
@@ -72,41 +71,6 @@ export const useToolSchema = (toolName: string) => {
     meta: {
       errorMessage: `Failed to load schema for tool: ${toolName}`
     }
-  });
-};
-
-/**
- * Hook to execute a tool
- * @returns Mutation for tool execution
- */
-export const useExecuteTool = () => {
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: (request: ToolExecuteRequest) => {
-      console.log('🔧 Executing tool via hook:', request.tool_name);
-      return toolsApi.executeTool(request);
-    },
-    onSuccess: (data, variables) => {
-      console.log('✅ Tool executed successfully:', variables.tool_name);
-      toast({
-        title: 'Tool Executed',
-        description: `${variables.tool_name} executed successfully`,
-      });
-    },
-    onError: (error, variables) => {
-      console.error('❌ Tool execution failed:', error);
-      
-      const errorMessage = error instanceof Error && error.message.includes('Failed to connect')
-        ? 'Unable to connect to backend server. Please ensure your backend is running.'
-        : `Failed to execute tool: ${variables.tool_name}`;
-      
-      toast({
-        title: 'Tool Execution Failed',
-        description: errorMessage,
-        variant: 'destructive',
-      });
-    },
   });
 };
 

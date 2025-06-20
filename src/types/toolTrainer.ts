@@ -1,4 +1,3 @@
-
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -15,7 +14,7 @@ export interface ToolCall {
   timestamp?: Date;
 }
 
-// New Content interface for the messages array
+// Content interface for the messages array
 export interface Content {
   kind: 'user' | 'assistant' | 'tool_call' | 'tool_result' | 'code' | 'text';
   content: string;
@@ -45,7 +44,11 @@ export interface CreateExampleRequest {
 // For updating existing examples
 export interface UpdateExampleRequest extends Partial<CreateExampleRequest> {}
 
-// Legacy interfaces for backward compatibility during transition
+// Legacy interfaces - keeping for compatibility during transition
+export interface DatabaseExample extends Example {}
+export interface TrainingExample extends Example {}
+export interface SavedConversation extends Example {}
+
 export interface ConversationState {
   id: string;
   userQuery: string;

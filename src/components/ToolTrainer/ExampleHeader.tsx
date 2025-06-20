@@ -6,11 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Upload, Sparkles, Loader2, FileText, Calendar } from 'lucide-react';
-import { TrainingExample } from '../../types/toolTrainer';
+import { Example } from '../../types/toolTrainer';
 
 interface ExampleHeaderProps {
-  example: TrainingExample;
-  onExampleChange: (example: TrainingExample) => void;
+  example: Example;
+  onExampleChange: (example: Example) => void;
   onLoad: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onAutoGenerate: () => void;
   isLoading: boolean;
@@ -25,23 +25,20 @@ export const ExampleHeader: React.FC<ExampleHeaderProps> = ({
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const updateExample = (updates: Partial<TrainingExample>) => {
+  const updateExample = (updates: Partial<Example>) => {
     onExampleChange({
       ...example,
       ...updates,
-      metadata: {
-        ...example.metadata,
-        updated_at: new Date().toISOString()
-      }
+      updated_at: new Date().toISOString()
     });
   };
 
   const addTag = (tag: string) => {
-    if (tag && !example.metadata.tags.includes(tag)) {
+    if (tag && !(example.meta?.tags || []).includes(tag)) {
       updateExample({
-        metadata: {
-          ...example.metadata,
-          tags: [...example.metadata.tags, tag]
+        meta: {
+          ...example.meta,
+          tags: [...(example.meta?.tags || []), tag]
         }
       });
     }
@@ -49,9 +46,9 @@ export const ExampleHeader: React.FC<ExampleHeaderProps> = ({
 
   const removeTag = (tagToRemove: string) => {
     updateExample({
-      metadata: {
-        ...example.metadata,
-        tags: example.metadata.tags.filter(tag => tag !== tagToRemove)
+      meta: {
+        ...example.meta,
+        tags: (example.meta?.tags || []).filter(tag => tag !== tagToRemove)
       }
     });
   };
@@ -109,7 +106,7 @@ export const ExampleHeader: React.FC<ExampleHeaderProps> = ({
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700">Tags</label>
             <div className="flex flex-wrap gap-2">
-              {example.metadata.tags.map((tag, index) => (
+              {(example.meta?.tags || []).map((tag, index) => (
                 <Badge 
                   key={index} 
                   variant="secondary" 
@@ -146,14 +143,14 @@ export const ExampleHeader: React.FC<ExampleHeaderProps> = ({
         <div className="flex items-center gap-4 text-sm text-gray-500">
           <div className="flex items-center">
             <Calendar className="w-4 h-4 mr-1" />
-            Created: {new Date(example.metadata.created_at).toLocaleDateString()}
+            Created: {new Date(example.created_at).toLocaleDateString()}
           </div>
           <div className="flex items-center">
             <Calendar className="w-4 h-4 mr-1" />
-            Updated: {new Date(example.metadata.updated_at).toLocaleDateString()}
+            Updated: {new Date(example.updated_at || example.created_at).toLocaleDateString()}
           </div>
           <Badge variant="outline">
-            {example.tool_calls?.length || 0} tool call{(example.tool_calls?.length || 0) !== 1 ? 's' : ''}
+            {example.messages?.length || 0} message{(example.messages?.length || 0) !== 1 ? 's' : ''}
           </Badge>
         </div>
       </CardContent>

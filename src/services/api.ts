@@ -19,7 +19,8 @@ class ApiService {
   }
 
   async executeTool(request: any) {
-    return toolsApi.executeTool(request);
+    // Legacy method - redirect to executeToolResult for now
+    return toolsApi.executeToolResult(request);
   }
 
   async executeToolResult(request: any) {

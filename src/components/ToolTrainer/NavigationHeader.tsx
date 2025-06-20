@@ -4,13 +4,13 @@ import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { SavedConversations } from './SavedConversations';
 import { SaveToDatabase } from './SaveToDatabase';
-import { TrainingExample, SavedConversation } from '../../types/toolTrainer';
+import { Example, Content } from '../../types/toolTrainer';
 
 interface NavigationHeaderProps {
-  currentExample: TrainingExample;
+  currentExample: Example;
   onNavigatePrevious: () => void;
   onNavigateNext: () => void;
-  onLoadConversation: (conversation: SavedConversation) => void;
+  onLoadConversation: (conversation: Example) => void;
 }
 
 export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
@@ -49,11 +49,9 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
       <div className="flex items-center gap-3">
         <SavedConversations onLoadConversation={onLoadConversation} />
         <SaveToDatabase 
-          userQuery={currentExample.user_query}
-          assistantResponse={currentExample.assistant_response}
-          toolCalls={currentExample.tool_calls}
+          messages={currentExample.messages || []}
+          tags={currentExample.meta?.tags || []}
           exampleName={currentExample.name}
-          tags={currentExample.metadata?.tags}
         />
       </div>
     </div>

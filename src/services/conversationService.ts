@@ -1,5 +1,5 @@
 
-import { SavedConversation } from '../types/toolTrainer';
+import { Example } from '../types/toolTrainer';
 
 interface PythonExecutionRequest {
   code: string;
@@ -18,9 +18,9 @@ class ConversationService {
   private readonly API_BASE_URL = 'http://localhost:8000'; // Your backend API URL
 
   // Save conversation locally
-  saveConversation(conversation: Omit<SavedConversation, 'id' | 'created_at'>): SavedConversation {
+  saveConversation(conversation: Omit<Example, 'id' | 'created_at'>): Example {
     const saved = this.getSavedConversations();
-    const newConversation: SavedConversation = {
+    const newConversation: Example = {
       ...conversation,
       id: Date.now(), // Use number instead of string
       created_at: new Date().toISOString()
@@ -32,7 +32,7 @@ class ConversationService {
   }
 
   // Get all saved conversations
-  getSavedConversations(): SavedConversation[] {
+  getSavedConversations(): Example[] {
     try {
       const saved = localStorage.getItem(this.STORAGE_KEY);
       return saved ? JSON.parse(saved) : [];

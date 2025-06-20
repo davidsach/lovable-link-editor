@@ -5,10 +5,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Search, Loader2, Download, List } from 'lucide-react';
-import { DatabaseExample } from '../../types/toolTrainer';
+import { Example } from '../../types/toolTrainer';
 
 interface RetrieveExampleProps {
-  onExampleRetrieved: (example: DatabaseExample) => void;
+  onExampleRetrieved: (example: Example) => void;
 }
 
 export const RetrieveExample: React.FC<RetrieveExampleProps> = ({
@@ -17,8 +17,8 @@ export const RetrieveExample: React.FC<RetrieveExampleProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [exampleId, setExampleId] = useState('');
-  const [retrievedExample, setRetrievedExample] = useState<DatabaseExample | null>(null);
-  const [allExamples, setAllExamples] = useState<DatabaseExample[]>([]);
+  const [retrievedExample, setRetrievedExample] = useState<Example | null>(null);
+  const [allExamples, setAllExamples] = useState<Example[]>([]);
   const [showAllExamples, setShowAllExamples] = useState(false);
 
   const handleRetrieveById = async () => {
@@ -70,7 +70,7 @@ export const RetrieveExample: React.FC<RetrieveExampleProps> = ({
     }
   };
 
-  const handleLoadExample = (example: DatabaseExample) => {
+  const handleLoadExample = (example: Example) => {
     onExampleRetrieved(example);
     setIsOpen(false);
     setRetrievedExample(null);
@@ -159,8 +159,7 @@ export const RetrieveExample: React.FC<RetrieveExampleProps> = ({
                 <div><span className="text-gray-400">ID:</span> {retrievedExample.id}</div>
                 <div><span className="text-gray-400">Name:</span> {retrievedExample.name || 'Untitled'}</div>
                 <div><span className="text-gray-400">Description:</span> {retrievedExample.description || 'No description'}</div>
-                <div><span className="text-gray-400">User Query:</span> {retrievedExample.user_query?.substring(0, 100)}...</div>
-                <div><span className="text-gray-400">Tool Calls:</span> {retrievedExample.tool_calls?.length || 0}</div>
+                <div><span className="text-gray-400">Messages:</span> {retrievedExample.messages?.length || 0}</div>
                 <div><span className="text-gray-400">Created:</span> {retrievedExample.created_at ? new Date(retrievedExample.created_at).toLocaleDateString() : 'Unknown'}</div>
               </div>
               
@@ -186,7 +185,7 @@ export const RetrieveExample: React.FC<RetrieveExampleProps> = ({
                         <div className="font-medium">{example.name || `Example ${example.id}`}</div>
                         <div className="text-gray-400">{example.description || 'No description'}</div>
                         <div className="text-xs text-gray-500">
-                          ID: {example.id} | Tool Calls: {example.tool_calls?.length || 0} | 
+                          ID: {example.id} | Messages: {example.messages?.length || 0} | 
                           Created: {example.created_at ? new Date(example.created_at).toLocaleDateString() : 'Unknown'}
                         </div>
                       </div>
@@ -217,9 +216,7 @@ export const RetrieveExample: React.FC<RetrieveExampleProps> = ({
               onClick={resetDialog}
               variant="outline"
               className="flex-1 bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
-            >
-              Close
-            </Button>
+            />
           </div>
         </div>
       </DialogContent>
