@@ -15,7 +15,7 @@ interface PythonExecutionResponse {
 
 class ConversationService {
   private readonly STORAGE_KEY = 'saved-conversations';
-  private readonly API_BASE_URL = 'http://localhost:8000'; // Your backend API URL
+  private readonly API_BASE_URL = 'http://127.0.0.1:8000'; // Your backend API URL
 
   // Save conversation locally
   saveConversation(conversation: Omit<Example, 'id' | 'created_at'>): Example {

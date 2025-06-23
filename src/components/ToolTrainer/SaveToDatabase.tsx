@@ -25,6 +25,16 @@ export const SaveToDatabase: React.FC<SaveToDatabaseProps> = ({
   const [description, setDescription] = useState('');
   const [localTags, setLocalTags] = useState(tags);
 
+  React.useEffect(() => {
+    if (isOpen) {
+      setName(exampleName);
+      setLocalTags(tags);
+      // Optionally reset description if you want to sync it too
+      // setDescription('');
+    }
+  }, [isOpen, exampleName, tags]);
+
+
   const handleSave = async () => {
     setIsSaving(true);
 

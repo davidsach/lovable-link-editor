@@ -40,6 +40,7 @@ export const EditExample: React.FC<EditExampleProps> = ({
           ...currentExample.meta,
           tags: tags.split(',').map(tag => tag.trim()).filter(tag => tag)
         }
+        
       };
       
       console.log('Updating example:', currentExample.id, updatedData);

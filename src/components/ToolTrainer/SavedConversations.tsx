@@ -8,7 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Trash2, Download, Calendar, MessageSquare } from 'lucide-react';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { Example } from '../../types/toolTrainer';
-import MessageRenderer from './MessageRenderer';
+
 
 interface SavedConversationsProps {
   onLoadConversation: (conversation: Example) => void;
@@ -56,7 +56,8 @@ export const SavedConversations: React.FC<SavedConversationsProps> = ({ onLoadCo
     const dataStr = JSON.stringify(conversation, null, 2);
     const dataBlob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(dataBlob);
-    const filename = `example-${conversation.name.replace(/\s+/g, '-')}.json`;
+    const filename = `example-${conversation.name.replace(/[^\w\d-]+/g, '-')}.json`;
+
     const link = document.createElement('a');
     link.href = url;
     link.download = filename;
@@ -169,24 +170,7 @@ export const SavedConversations: React.FC<SavedConversationsProps> = ({ onLoadCo
             </ScrollArea>
           </div>
 
-          {/* Right Panel - Message Details */}
-          <div className="w-1/2 border-l pl-4">
-            {selectedConversation ? (
-              <div>
-                <h3 className="text-lg font-semibold mb-4">Messages</h3>
-                <ScrollArea className="h-full">
-                  <MessageRenderer messages={selectedConversation.messages} />
-                </ScrollArea>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center h-full text-gray-500">
-                <div className="text-center">
-                  <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>Select a conversation to view messages</p>
-                </div>
-              </div>
-            )}
-          </div>
+         
         </div>
 
         <ConfirmationDialog

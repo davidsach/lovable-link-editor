@@ -28,7 +28,12 @@ export interface Example {
   name: string;
   description?: string;
   messages: Content[];
-  meta?: Record<string, any>;
+  meta?: {
+    tags?: string[];
+    created_by?: string;
+    source?: string;
+    [key: string]: any;
+  };
   created_at: string;
   updated_at?: string;
 }
@@ -50,11 +55,15 @@ export interface TrainingExample extends Example {}
 export interface SavedConversation extends Example {}
 
 export interface ConversationState {
-  id: string;
-  userQuery: string;
-  assistantResponse: string;
-  toolCalls: ToolCall[];
-  tags: string[];
+  id: string | number;
+  name: string;
+  description?: string;
+  messages: Content[];
+  meta: {
+    tags: string[];
+    created_by?: string;
+    source?: string;
+  };
   createdAt: Date;
   updatedAt: Date;
 }
