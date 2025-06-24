@@ -1,4 +1,3 @@
-
 /**
  * API Types and Interfaces
  * This file contains all TypeScript types used for API communication
@@ -22,17 +21,50 @@ export interface ApiError {
 }
 
 // =============================================================================
-// CONTENT AND MESSAGE TYPES
+// CONTENT AND MESSAGE TYPES (MATCHING BACKEND)
 // =============================================================================
 
 /**
+ * Enum for Role (matches backend Role enum)
+ */
+export enum Role {
+  SYSTEM = 1,
+  USER = 2,
+  ASSISTANT = 3,
+}
+
+/**
+ * Enum for ChunkKind (matches backend ChunkKind enum)
+ */
+export enum ChunkKind {
+  UNKNOWN_KIND = 0,
+  CONTENT = 1,
+  TOOL_CALL = 2,
+  TOOL_RESULT = 3,
+  FORMATTING = 4,
+}
+
+/**
+ * Single chunk of a message (matches backend Chunk model)
+ */
+export interface Chunk {
+  text?: string;
+  // You can add other media fields here if needed (image, audio, video, file, control, etc.)
+  kind: ChunkKind;
+  role: Role;
+  metadata?: Record<string, any>;
+  mimetype?: string;
+  channel?: string;
+  trainable?: number;
+  timestamp?: string;
+}
+
+/**
  * Content object for the new messages structure
+ * Each message is a list of chunks
  */
 export interface Content {
-  kind: 'user' | 'assistant' | 'tool_call' | 'tool_result' | 'code' | 'text';
-  content: string;
-  metadata?: Record<string, any>;
-  timestamp?: string;
+  chunks: Chunk[];
 }
 
 // =============================================================================
@@ -46,7 +78,7 @@ export interface Example {
   id: number;
   name: string;
   description?: string;
-  messages: Content[];
+  messages: Content[]; // List of Content objects, each with .chunks
   meta?: Record<string, any>;
   created_at: string;
   updated_at?: string;
@@ -71,9 +103,6 @@ export interface UpdateExampleRequest extends Partial<CreateExampleRequest> {}
 // TOOL RELATED TYPES
 // =============================================================================
 
-/**
- * Tool Parameter Definition
- */
 export interface ToolParameter {
   param_name: string;
   param_type: string;
@@ -81,26 +110,17 @@ export interface ToolParameter {
   default_value: string;
 }
 
-/**
- * Tool Function Definition
- */
 export interface ToolFunction {
   func_name: string;
   params: ToolParameter[];
   return_value: ToolParameter;
 }
 
-/**
- * Python Class Definition
- */
 export interface PythonClass {
   class_name: string;
   params: ToolParameter[];
 }
 
-/**
- * Complete Tool Definition
- */
 export interface Tool {
   tool_name: string;
   description?: string;
@@ -112,46 +132,28 @@ export interface Tool {
 // CODE EXECUTION TYPES
 // =============================================================================
 
-/**
- * Single Code Chunk for Execution
- */
 export interface CodeChunk {
   chunk_id: number;
   code: string;
 }
 
-/**
- * Output from Code Chunk Execution
- */
 export interface CodeChunkOutput {
   chunk_id: number;
   code_output: Record<string, any>;
 }
 
-/**
- * Request to Execute Python Code
- */
 export interface ExecuteToolRequest {
   code: string;
 }
 
-/**
- * Response from Python Code Execution
- */
 export interface ExecuteToolResponse {
   code_output: Record<string, any>;
 }
 
-/**
- * Request to Execute Multiple Code Chunks
- */
 export interface ExecuteAllToolsRequest {
   code_chunks: CodeChunk[];
 }
 
-/**
- * Response from Multiple Code Chunks Execution
- */
 export interface ExecuteAllToolsResponse {
   code_chunk_output: CodeChunkOutput[];
 }

@@ -40,7 +40,7 @@ import {
   Download
 } from 'lucide-react';
 import { useTools, useExecuteToolResult, useExecuteAllTools } from '@/hooks/useApi';
-import { Tool, Message, ConversationState,Content } from '@/types/toolTrainer';
+import { Tool, ConversationState, Content, Chunk, Role, ChunkKind } from '@/types/toolTrainer';
 
 import { SavedConversations } from '@/components/ToolTrainer/SavedConversations';
 import { SaveToDatabase } from '@/components/ToolTrainer/SaveToDatabase';
@@ -190,7 +190,7 @@ const ToolTrainer = () => {
    // Form fields
    const [exampleName, setExampleName] = useState('Example 1');
    const [description, setDescription] = useState('');
-   const [tags, setTags] = useState<string[]>([]);
+  //  const [tags, setTags] = useState<string[]>([]);
    const [newTag, setNewTag] = useState('');
    
   // Core conversation state
@@ -237,30 +237,13 @@ const ToolTrainer = () => {
 
   
 
-// Synchronize conversation.toolCalls with toolCalls state
-// useEffect(() => {
-//   setConversation(prev => ({
-//     ...prev,
-//     toolCalls: toolCalls
-//   }));
-// }, [toolCalls]);
-
-// Auto-generate assistantResponse when toolCalls complete
-// useEffect(() => {
-//   const completedToolCalls = toolCalls.filter(tc => tc.status === 'completed' && tc.result);
-//   if (completedToolCalls.length > 0 && !conversation.assistantResponse) {
-//     const generatedResponse = completedToolCalls.map(tc => {
-//       const params = JSON.stringify(tc.parameters, null, 2);
-//       const result = typeof tc.result === 'string' ? tc.result : JSON.stringify(tc.result, null, 2);
-//       return `Tool: ${tc.toolName}\nParameters: ${params}\nResult: ${result}`;
-//     }).join('\n\n');
-//     setConversation(prev => ({
-//       ...prev,
-//       assistantResponse: generatedResponse
-//     }));
-//   }
-// }, [toolCalls, conversation.assistantResponse]);
-
+  useEffect(() => {
+    setConversation(prev => ({
+      ...prev,
+      name: exampleName,
+      description: description
+    }));
+  }, [exampleName, description]);
 
   // Update conversation timestamps when content changes
   useEffect(() => {
@@ -271,8 +254,27 @@ const ToolTrainer = () => {
       }));
     }
   }, [conversation.messages]);
-  
 
+  // ✅ ADDED: Helper functions for creating chunks
+  const createContentChunk = (
+    text: string,
+    kind: ChunkKind,
+    role: Role,
+    metadata: Record<string, any> = {}
+  ): Chunk => ({
+    text,
+    kind,
+    role,
+    metadata,
+    timestamp: new Date().toISOString()
+  });
+
+  const createContentMessage = (chunks: Chunk[]): Content => ({
+    chunks
+  });
+
+  // ✅ ADDED: Tag management functions
+  
   // =============================================================================
   // API HOOKS
   // =============================================================================
@@ -295,14 +297,26 @@ const ToolTrainer = () => {
   };
 
   const addTag = () => {
-    if (newTag && !tags.includes(newTag)) {
-      setTags([...tags, newTag]);
+    if (newTag.trim() && !conversation.meta.tags.includes(newTag.trim())) {
+      setConversation(prev => ({
+        ...prev,
+        meta: {
+          ...prev.meta,
+          tags: [...prev.meta.tags, newTag.trim()]
+        }
+      }));
       setNewTag('');
     }
   };
 
   const removeTag = (tagToRemove: string) => {
-    setTags(tags.filter(tag => tag !== tagToRemove));
+    setConversation(prev => ({
+      ...prev,
+      meta: {
+        ...prev.meta,
+        tags: prev.meta.tags.filter(tag => tag !== tagToRemove)
+      }
+    }));
   };
 
   // Helper function to generate Python function signature in one line
@@ -432,11 +446,18 @@ const ToolTrainer = () => {
 
   const addTextChunk = () => {
     if (messageContent.trim()) {
+      // Create a chunk with the new structure
+      const newChunk: Chunk = {
+        text: messageContent,
+        kind: ChunkKind.CONTENT,
+        role: currentStep === 'user' ? Role.USER : Role.ASSISTANT,
+        metadata: {},
+        timestamp: new Date().toISOString()
+      };
+  
+      // Create a Content message containing the chunk
       const newMessage: Content = {
-        kind: currentStep, // 'user' or 'assistant'
-        content: messageContent,
-        timestamp: new Date().toISOString(),
-        metadata: {}
+        chunks: [newChunk]
       };
   
       setConversation(prev => ({
@@ -506,35 +527,41 @@ const ToolTrainer = () => {
   
       updateToolCall(index, { result: formattedResult, status: 'completed' });
   
-      // === NEW: Add tool_call and tool_result messages to conversation ===
-      // 1. Add tool_call message
+      // ✅ UPDATED: Create tool_call chunk
+      const toolCallChunk: Chunk = {
+        text: JSON.stringify({
+          tool_name: toolCall.toolName,
+          parameters: toolCall.parameters,
+          python_code: toolCall.pythonCode
+        }),
+        kind: ChunkKind.TOOL_CALL,
+        role: Role.ASSISTANT,
+        metadata: {
+          tool_id: toolCall.id,
+          status: 'completed'
+        },
+        timestamp: new Date().toISOString()
+      };
+  
+      // ✅ UPDATED: Create tool_result chunk
+      const toolResultChunk: Chunk = {
+        text: formattedResult,
+        kind: ChunkKind.TOOL_RESULT,
+        role: Role.ASSISTANT,
+        metadata: {
+          tool_id: toolCall.id,
+          status: 'completed'
+        },
+        timestamp: new Date().toISOString()
+      };
+  
+      // ✅ UPDATED: Add both chunks as separate Content messages
       setConversation(prev => ({
         ...prev,
         messages: [
           ...prev.messages,
-          {
-            kind: 'tool_call',
-            content: JSON.stringify({
-              tool_name: toolCall.toolName,
-              parameters: toolCall.parameters,
-              python_code: toolCall.pythonCode
-            }),
-            timestamp: new Date().toISOString(),
-            metadata: {
-              tool_id: toolCall.id,
-              status: 'completed'
-            }
-          },
-          // 2. Add tool_result message
-          {
-            kind: 'tool_result',
-            content: formattedResult,
-            timestamp: new Date().toISOString(),
-            metadata: {
-              tool_id: toolCall.id,
-              status: 'completed'
-            }
-          }
+          { chunks: [toolCallChunk] },
+          { chunks: [toolResultChunk] }
         ],
         updatedAt: new Date()
       }));
@@ -543,33 +570,41 @@ const ToolTrainer = () => {
       const errorMessage = error instanceof Error ? error.message : 'Execution failed';
       updateToolCall(index, { result: `Error: ${errorMessage}`, status: 'failed' });
   
-      // === Optionally add a tool_call and tool_result with error status ===
+      // ✅ UPDATED: Create error tool_call chunk
+      const toolCallChunk: Chunk = {
+        text: JSON.stringify({
+          tool_name: toolCall.toolName,
+          parameters: toolCall.parameters,
+          python_code: toolCall.pythonCode
+        }),
+        kind: ChunkKind.TOOL_CALL,
+        role: Role.ASSISTANT,
+        metadata: {
+          tool_id: toolCall.id,
+          status: 'failed'
+        },
+        timestamp: new Date().toISOString()
+      };
+  
+      // ✅ UPDATED: Create error tool_result chunk
+      const toolResultChunk: Chunk = {
+        text: `Error: ${errorMessage}`,
+        kind: ChunkKind.TOOL_RESULT,
+        role: Role.ASSISTANT,
+        metadata: {
+          tool_id: toolCall.id,
+          status: 'failed'
+        },
+        timestamp: new Date().toISOString()
+      };
+  
+      // ✅ UPDATED: Add error chunks as separate Content messages
       setConversation(prev => ({
         ...prev,
         messages: [
           ...prev.messages,
-          {
-            kind: 'tool_call',
-            content: JSON.stringify({
-              tool_name: toolCall.toolName,
-              parameters: toolCall.parameters,
-              python_code: toolCall.pythonCode
-            }),
-            timestamp: new Date().toISOString(),
-            metadata: {
-              tool_id: toolCall.id,
-              status: 'failed'
-            }
-          },
-          {
-            kind: 'tool_result',
-            content: `Error: ${errorMessage}`,
-            timestamp: new Date().toISOString(),
-            metadata: {
-              tool_id: toolCall.id,
-              status: 'failed'
-            }
-          }
+          { chunks: [toolCallChunk] },
+          { chunks: [toolResultChunk] }
         ],
         updatedAt: new Date()
       }));
@@ -580,76 +615,80 @@ const ToolTrainer = () => {
   const executeAllToolCalls = async () => {
     // Filter tool calls that have code
     const toolCallsWithCode = toolCalls.filter(tc => tc.pythonCode.trim());
-    
+  
     if (toolCallsWithCode.length === 0) {
       return;
     }
-
+  
     // Set all tool calls to executing status
     toolCallsWithCode.forEach((toolCall, index) => {
       const originalIndex = toolCalls.findIndex(tc => tc.id === toolCall.id);
       updateToolCall(originalIndex, { status: 'executing' });
     });
-
+  
     try {
       // Prepare code chunks for API call
       const codeChunks = toolCallsWithCode.map((toolCall, index) => ({
         chunk_id: index,
         code: toolCall.pythonCode
       }));
-
+  
       // Call the API
       const result = await executeAllToolsMutation.mutateAsync({
         code_chunks: codeChunks
       });
-
+  
       result.code_chunk_output.forEach((output) => {
         const toolCall = toolCallsWithCode[output.chunk_id];
         const originalIndex = toolCalls.findIndex(tc => tc.id === toolCall.id);
-      
+  
         const formattedResult = typeof output.code_output === 'object'
           ? JSON.stringify(output.code_output, null, 2)
           : String(output.code_output);
-      
+  
         updateToolCall(originalIndex, {
           result: formattedResult,
           status: 'completed'
         });
-      
-        // Add tool_call and tool_result messages
+  
+        // ✅ Add tool_call and tool_result as Content messages with proper Chunk structure
+        const toolCallChunk: Chunk = {
+          text: JSON.stringify({
+            tool_name: toolCall.toolName,
+            parameters: toolCall.parameters,
+            python_code: toolCall.pythonCode
+          }),
+          kind: ChunkKind.TOOL_CALL,
+          role: Role.ASSISTANT,
+          metadata: {
+            tool_id: toolCall.id,
+            status: 'completed'
+          },
+          timestamp: new Date().toISOString()
+        };
+  
+        const toolResultChunk: Chunk = {
+          text: formattedResult,
+          kind: ChunkKind.TOOL_RESULT,
+          role: Role.ASSISTANT,
+          metadata: {
+            tool_id: toolCall.id,
+            status: 'completed'
+          },
+          timestamp: new Date().toISOString()
+        };
+  
         setConversation(prev => ({
           ...prev,
           messages: [
             ...prev.messages,
-            {
-              kind: 'tool_call',
-              content: JSON.stringify({
-                tool_name: toolCall.toolName,
-                parameters: toolCall.parameters,
-                python_code: toolCall.pythonCode
-              }),
-              timestamp: new Date().toISOString(),
-              metadata: {
-                tool_id: toolCall.id,
-                status: 'completed'
-              }
-            },
-            {
-              kind: 'tool_result',
-              content: formattedResult,
-              timestamp: new Date().toISOString(),
-              metadata: {
-                tool_id: toolCall.id,
-                status: 'completed'
-              }
-            }
+            { chunks: [toolCallChunk] },
+            { chunks: [toolResultChunk] }
           ],
           updatedAt: new Date()
         }));
       });
-      
-      
-
+  
       // Show all results section after execution
       setShowAllResults(true);
     } catch (error) {
@@ -661,161 +700,204 @@ const ToolTrainer = () => {
           result: `Error: ${errorMessage}`,
           status: 'failed'
         });
+  
+        // Add failed tool_call and tool_result as Content messages
+        const toolCallChunk: Chunk = {
+          text: JSON.stringify({
+            tool_name: toolCall.toolName,
+            parameters: toolCall.parameters,
+            python_code: toolCall.pythonCode
+          }),
+          kind: ChunkKind.TOOL_CALL,
+          role: Role.ASSISTANT,
+          metadata: {
+            tool_id: toolCall.id,
+            status: 'failed'
+          },
+          timestamp: new Date().toISOString()
+        };
+  
+        const toolResultChunk: Chunk = {
+          text: `Error: ${errorMessage}`,
+          kind: ChunkKind.TOOL_RESULT,
+          role: Role.ASSISTANT,
+          metadata: {
+            tool_id: toolCall.id,
+            status: 'failed'
+          },
+          timestamp: new Date().toISOString()
+        };
+  
+        setConversation(prev => ({
+          ...prev,
+          messages: [
+            ...prev.messages,
+            { chunks: [toolCallChunk] },
+            { chunks: [toolResultChunk] }
+          ],
+          updatedAt: new Date()
+        }));
       });
     }
   };
-
+  
   const removeToolCall = (index: number) => {
     setToolCalls(prev => prev.filter((_, i) => i !== index));
   };
-
+  
   // =============================================================================
-  // NAVIGATION
-  // =============================================================================
-  
-  const navigatePrevious = () => {
-    if (currentExampleId > 1) {
-      setCurrentExampleId(currentExampleId - 1);
-    }
-  };
+// NAVIGATION
+// =============================================================================
 
-  const navigateNext = () => {
-    setCurrentExampleId(currentExampleId + 1);
-  };
+const navigatePrevious = () => {
+  if (currentExampleId > 1) {
+    setCurrentExampleId(currentExampleId - 1);
+  }
+};
 
-  const goBackStep = () => {
-    if (conversationHistory.length > 0) {
-      // Get the last saved state
-      const lastState = conversationHistory[conversationHistory.length - 1];
-  
-      // Restore the conversation to the previous state
-      setConversation(prev => ({
-        ...prev,
-        messages: [...lastState.messages],
-        meta: { ...lastState.meta }
-      }));
-      setCurrentStep(lastState.step);
-  
-      // Remove this state from history
-      setConversationHistory(prev => prev.slice(0, -1));
-  
-      // Reset current turn states
-      setShowTextChunkInput(false);
-      setMessageContent('');
-      setHasAddedTextChunk(false);
-    } else {
-      // If no history, go back to initial state
-      setConversation(prev => ({
-        ...prev,
-        messages: [],
-        meta: { tags: [] }
-      }));
-      setCurrentStep('user');
-      setConversationStarted(false);
-      setShowTextChunkInput(false);
-      setMessageContent('');
-      setHasAddedTextChunk(false);
-    }
-  };
-  
+const navigateNext = () => {
+  setCurrentExampleId(currentExampleId + 1);
+};
 
-  const goBack = () => {
-    // Navigate back to previous page
-    window.history.back();
-  };
+const goBackStep = () => {
+  if (conversationHistory.length > 0) {
+    // Get the last saved state
+    const lastState = conversationHistory[conversationHistory.length - 1];
 
-  // =============================================================================
-  // VALIDATION FUNCTIONS
-  // =============================================================================
-  
-  const canStartNewTurn = () => {
-    // If conversation hasn't started, can always start new turn
-    if (!conversationStarted) return true;
-    
-    if (currentStep === 'user') {
-      // User can start new turn if they have added a text chunk
-      return hasAddedTextChunk;
-    } else {
-      // Assistant can start new turn if they have added text chunk OR tool calls
-      return hasAddedTextChunk || toolCalls.length > 0;
-    }
-  };
-
-  const canAddTextChunk = () => {
-    if (currentStep === 'user') {
-      // User can only add one text chunk per turn
-      return !hasAddedTextChunk;
-    }
-    // Assistant can add multiple text chunks
-    return true;
-  };
-
-  const canAddToolCall = () => {
-    if (currentStep !== 'assistant') return false;
-    
-    // Check if there's already an incomplete tool call
-    const hasIncompleteToolCall = toolCalls.some(tc => 
-      !tc.toolName || !tc.pythonCode.trim() || tc.status === 'pending'
-    );
-    
-    return !hasIncompleteToolCall;
-  };
-
-  const getExecutableToolCallsCount = () => {
-    return toolCalls.filter(tc => 
-      tc.pythonCode.trim() && tc.status !== 'completed' && tc.status !== 'executing'
-    ).length;
-  };
-
-  const getExecutingToolCallsCount = () => {
-    return toolCalls.filter(tc => tc.status === 'executing').length;
-  };
-
-  const getToolCallsWithCodeCount = () => {
-    return toolCalls.filter(tc => tc.pythonCode.trim()).length;
-  };
-
-  const canExecuteAllToolCalls = () => {
-    return toolCalls.some(tc => tc.pythonCode.trim()) && !executeAllToolsMutation.isPending;
-  };
-
-  const canGoBackStep = () => {
-    return conversationHistory.length > 0 || conversation.messages.length > 0;
-  };
-  
-
-  // =============================================================================
-  // EVENT HANDLERS
-  // =============================================================================
-  
-  const handleSaveConversation = () => {
-    // TODO: Implement actual save functionality with backend
-    console.log('Conversation saved successfully');
-  };
-
-  const handleLoadConversation = (savedConversation: any) => {
-    setConversation({
-      id: savedConversation.id,
-      name: savedConversation.name,
-      description: savedConversation.description || '',
-      messages: savedConversation.messages || [],
-      meta: savedConversation.meta || { tags: [] },
-      createdAt: new Date(savedConversation.created_at),
-      updatedAt: new Date(savedConversation.updated_at || savedConversation.created_at)
-    });
-    setExampleName(savedConversation.name);
-    setDescription(savedConversation.description || '');
-    setConversationStarted((savedConversation.messages?.length ?? 0) > 0);
-  };
-
-  const toolCallPairs = React.useMemo(() => {
-    const calls = conversation.messages.filter(m => m.kind === 'tool_call');
-    const results = conversation.messages.filter(m => m.kind === 'tool_result');
-    return calls.map(call => ({
-      call,
-      result: results.find(res => res.metadata?.tool_id === call.metadata?.tool_id)
+    // Restore the conversation to the previous state
+    setConversation(prev => ({
+      ...prev,
+      messages: [...lastState.messages], // Content[] structure
+      meta: { ...lastState.meta }
     }));
-  }, [conversation.messages]);
+    setCurrentStep(lastState.step);
+
+    // Remove this state from history
+    setConversationHistory(prev => prev.slice(0, -1));
+
+    // Reset current turn states
+    setShowTextChunkInput(false);
+    setMessageContent('');
+    setHasAddedTextChunk(false);
+  } else {
+    // If no history, go back to initial state
+    setConversation(prev => ({
+      ...prev,
+      messages: [],
+      meta: { tags: [] }
+    }));
+    setCurrentStep('user');
+    setConversationStarted(false);
+    setShowTextChunkInput(false);
+    setMessageContent('');
+    setHasAddedTextChunk(false);
+  }
+};
+
+const goBack = () => {
+  // Navigate back to previous page
+  window.history.back();
+};
+
+// =============================================================================
+// VALIDATION FUNCTIONS
+// =============================================================================
+
+const canStartNewTurn = () => {
+  // If conversation hasn't started, can always start new turn
+  if (!conversationStarted) return true;
+
+  if (currentStep === 'user') {
+    // User can start new turn if they have added a text chunk
+    return hasAddedTextChunk;
+  } else {
+    // Assistant can start new turn if they have added text chunk OR tool calls
+    return hasAddedTextChunk || toolCalls.length > 0;
+  }
+};
+
+const canAddTextChunk = () => {
+  if (currentStep === 'user') {
+    // User can only add one text chunk per turn
+    return !hasAddedTextChunk;
+  }
+  // Assistant can add multiple text chunks
+  return true;
+};
+
+const canAddToolCall = () => {
+  if (currentStep !== 'assistant') return false;
+
+  // Check if there's already an incomplete tool call
+  const hasIncompleteToolCall = toolCalls.some(tc =>
+    !tc.toolName || !tc.pythonCode.trim() || tc.status === 'pending'
+  );
+
+  return !hasIncompleteToolCall;
+};
+
+const getExecutableToolCallsCount = () => {
+  return toolCalls.filter(tc =>
+    tc.pythonCode.trim() && tc.status !== 'completed' && tc.status !== 'executing'
+  ).length;
+};
+
+const getExecutingToolCallsCount = () => {
+  return toolCalls.filter(tc => tc.status === 'executing').length;
+};
+
+const getToolCallsWithCodeCount = () => {
+  return toolCalls.filter(tc => tc.pythonCode.trim()).length;
+};
+
+const canExecuteAllToolCalls = () => {
+  return toolCalls.some(tc => tc.pythonCode.trim()) && !executeAllToolsMutation.isPending;
+};
+
+const canGoBackStep = () => {
+  return conversationHistory.length > 0 || conversation.messages.length > 0;
+};
+
+
+  // =============================================================================
+// EVENT HANDLERS
+// =============================================================================
+
+const handleSaveConversation = () => {
+  // TODO: Implement actual save functionality with backend
+  // You would send conversation.messages (Content[]), which is now in the correct structure
+  console.log('Conversation saved successfully');
+};
+
+const handleLoadConversation = (savedConversation: any) => {
+  setConversation({
+    id: savedConversation.id,
+    name: savedConversation.name,
+    description: savedConversation.description || '',
+    messages: savedConversation.messages || [], // Content[]
+    meta: savedConversation.meta || { tags: [] },
+    createdAt: new Date(savedConversation.created_at),
+    updatedAt: new Date(savedConversation.updated_at || savedConversation.created_at)
+  });
+  setExampleName(savedConversation.name);
+  setDescription(savedConversation.description || '');
+  setConversationStarted((savedConversation.messages?.length ?? 0) > 0);
+};
+
+// For All Results section: Pair tool_call and tool_result chunks
+const toolCallPairs = React.useMemo(() => {
+  // Flatten all chunks from all messages
+  const allChunks = conversation.messages.flatMap(m => m.chunks);
+
+  const calls = allChunks.filter(chunk => chunk.kind === ChunkKind.TOOL_CALL);
+  const results = allChunks.filter(chunk => chunk.kind === ChunkKind.TOOL_RESULT);
+
+  return calls.map(call => ({
+    call,
+    result: results.find(res => res.metadata?.tool_id === call.metadata?.tool_id)
+  }));
+}, [conversation.messages]);
+
   
 
   // =============================================================================
@@ -1080,7 +1162,6 @@ const ToolTrainer = () => {
           </Card>
         </div>
 
-        {/* All Results Section - Fixed scrolling */}
         {showAllResults && toolCallPairs.length > 0 && (
   <div className="border-b border-gray-700/50 bg-gradient-to-r from-gray-800/90 to-gray-700/90 backdrop-blur">
     <div className="p-4">
@@ -1101,52 +1182,60 @@ const ToolTrainer = () => {
       <div className="h-96 overflow-hidden">
         <ScrollArea className="h-full w-full">
           <div className="space-y-3 pr-4">
-            {toolCallPairs.map(({ call, result }, index) => (
-              <div key={call.metadata?.tool_id || index} className="bg-gradient-to-r from-gray-700/80 to-gray-600/80 rounded-lg p-4 border border-gray-600/50">
-                <div className="flex items-center gap-3 mb-3">
-                  <Badge variant="outline" className="bg-blue-500/20 text-blue-300 border-blue-400/50">
-                    #{index + 1}
-                  </Badge>
-                  <span className="text-sm font-medium text-white">
-                    {JSON.parse(call.content).tool_name || 'Unknown Tool'}
-                  </span>
-                  <Badge
-                    variant={
-                      (result?.metadata?.status === 'completed') ? 'default' :
-                      (result?.metadata?.status === 'failed') ? 'destructive' :
-                      (result?.metadata?.status === 'executing') ? 'secondary' : 'outline'
-                    }
-                    className={`text-xs ${
-                      result?.metadata?.status === 'completed' ? 'bg-green-500/20 text-green-300 border-green-400/50' :
-                      result?.metadata?.status === 'failed' ? 'bg-red-500/20 text-red-300 border-red-400/50' :
-                      result?.metadata?.status === 'executing' ? 'bg-yellow-500/20 text-yellow-300 border-yellow-400/50' :
-                      'bg-gray-500/20 text-gray-300 border-gray-400/50'
-                    }`}
-                  >
-                    {result?.metadata?.status === 'executing' && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
-                    {result?.metadata?.status === 'completed' && <CheckCircle className="w-3 h-3 mr-1" />}
-                    {result?.metadata?.status === 'failed' && <AlertTriangle className="w-3 h-3 mr-1" />}
-                    {result?.metadata?.status || 'pending'}
-                  </Badge>
+            {toolCallPairs.map(({ call, result }, index) => {
+              let callData: any = {};
+              try {
+                callData = call.text ? JSON.parse(call.text) : {};
+              } catch {
+                callData = {};
+              }
+              return (
+                <div key={call.metadata?.tool_id || index} className="bg-gradient-to-r from-gray-700/80 to-gray-600/80 rounded-lg p-4 border border-gray-600/50">
+                  <div className="flex items-center gap-3 mb-3">
+                    <Badge variant="outline" className="bg-blue-500/20 text-blue-300 border-blue-400/50">
+                      #{index + 1}
+                    </Badge>
+                    <span className="text-sm font-medium text-white">
+                      {callData.tool_name || 'Unknown Tool'}
+                    </span>
+                    <Badge
+                      variant={
+                        (result?.metadata?.status === 'completed') ? 'default' :
+                        (result?.metadata?.status === 'failed') ? 'destructive' :
+                        (result?.metadata?.status === 'executing') ? 'secondary' : 'outline'
+                      }
+                      className={`text-xs ${
+                        result?.metadata?.status === 'completed' ? 'bg-green-500/20 text-green-300 border-green-400/50' :
+                        result?.metadata?.status === 'failed' ? 'bg-red-500/20 text-red-300 border-red-400/50' :
+                        result?.metadata?.status === 'executing' ? 'bg-yellow-500/20 text-yellow-300 border-yellow-400/50' :
+                        'bg-gray-500/20 text-gray-300 border-gray-400/50'
+                      }`}
+                    >
+                      {result?.metadata?.status === 'executing' && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
+                      {result?.metadata?.status === 'completed' && <CheckCircle className="w-3 h-3 mr-1" />}
+                      {result?.metadata?.status === 'failed' && <AlertTriangle className="w-3 h-3 mr-1" />}
+                      {result?.metadata?.status || 'pending'}
+                    </Badge>
+                  </div>
+                  {callData.python_code && (
+                    <div className="mb-3">
+                      <div className="text-xs text-gray-400 mb-1">Code:</div>
+                      <pre className="text-xs text-blue-300 bg-gray-900/60 p-2 rounded border border-gray-700/50 font-mono overflow-x-auto">
+                        {callData.python_code}
+                      </pre>
+                    </div>
+                  )}
+                  {result?.text && (
+                    <div>
+                      <div className="text-xs text-gray-400 mb-1">Result:</div>
+                      <pre className="text-xs text-gray-300 bg-gray-900/60 p-2 rounded border border-gray-700/50 font-mono overflow-x-auto max-h-32 overflow-y-auto">
+                        {result.text}
+                      </pre>
+                    </div>
+                  )}
                 </div>
-                {JSON.parse(call.content).python_code && (
-                  <div className="mb-3">
-                    <div className="text-xs text-gray-400 mb-1">Code:</div>
-                    <pre className="text-xs text-blue-300 bg-gray-900/60 p-2 rounded border border-gray-700/50 font-mono overflow-x-auto">
-                      {JSON.parse(call.content).python_code}
-                    </pre>
-                  </div>
-                )}
-                {result?.content && (
-                  <div>
-                    <div className="text-xs text-gray-400 mb-1">Result:</div>
-                    <pre className="text-xs text-gray-300 bg-gray-900/60 p-2 rounded border border-gray-700/50 font-mono overflow-x-auto max-h-32 overflow-y-auto">
-                      {result.content}
-                    </pre>
-                  </div>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </ScrollArea>
       </div>
@@ -1208,89 +1297,99 @@ const ToolTrainer = () => {
       </div>
     ) : (
       <div className="space-y-6">
-        {conversation.messages.map((msg, idx) => {
-          // Helper to parse tool call content if needed
-          let toolCallData = null;
-          if (msg.kind === 'tool_call') {
-            try {
-              toolCallData = JSON.parse(msg.content);
-            } catch {}
-          }
+        {conversation.messages.map((msg, msgIdx) =>
+          msg.chunks.map((chunk, chunkIdx) => {
+            // Helper to parse tool call content if needed
+            let toolCallData = null;
+            if (chunk.kind === ChunkKind.TOOL_CALL) {
+              try {
+                toolCallData = chunk.text ? JSON.parse(chunk.text) : null;
+              } catch {}
+            }
 
-          // Determine alignment and style
-          let align = 'justify-start';
-          let bubbleStyle = 'bg-gradient-to-r from-gray-700 to-gray-600 text-white border border-gray-500/30';
-          if (msg.kind === 'user') {
-            align = 'justify-end';
-            bubbleStyle = 'bg-gradient-to-r from-blue-600 to-blue-500 text-white';
-          } else if (msg.kind === 'assistant') {
-            align = 'justify-start';
-            bubbleStyle = 'bg-gradient-to-r from-gray-700 to-gray-600 text-white border border-gray-500/30';
-          } else if (msg.kind === 'tool_call') {
-            align = 'justify-start';
-            bubbleStyle = 'bg-gradient-to-r from-green-700 to-green-600 text-white border border-green-500/30';
-          } else if (msg.kind === 'tool_result') {
-            align = 'justify-start';
-            bubbleStyle = 'bg-gradient-to-r from-orange-700 to-orange-600 text-white border border-orange-500/30';
-          } else if (msg.kind === 'code') {
-            align = 'justify-start';
-            bubbleStyle = 'bg-gradient-to-r from-gray-900 to-gray-800 text-green-400 border border-gray-700/30';
-          }
+            // Determine alignment and style
+            let align = 'justify-start';
+            let bubbleStyle = 'bg-gradient-to-r from-gray-700 to-gray-600 text-white border border-gray-500/30';
+            if (chunk.role === Role.USER) {
+              align = 'justify-end';
+              bubbleStyle = 'bg-gradient-to-r from-blue-600 to-blue-500 text-white';
+            } else if (chunk.role === Role.ASSISTANT) {
+              align = 'justify-start';
+              bubbleStyle = 'bg-gradient-to-r from-gray-700 to-gray-600 text-white border border-gray-500/30';
+            }
+            if (chunk.kind === ChunkKind.TOOL_CALL) {
+              align = 'justify-start';
+              bubbleStyle = 'bg-gradient-to-r from-green-700 to-green-600 text-white border border-green-500/30';
+            } else if (chunk.kind === ChunkKind.TOOL_RESULT) {
+              align = 'justify-start';
+              bubbleStyle = 'bg-gradient-to-r from-orange-700 to-orange-600 text-white border border-orange-500/30';
+            }
+            // For code: use CONTENT kind + metadata.subtype === 'code'
+            else if (chunk.kind === ChunkKind.CONTENT && chunk.metadata?.subtype === 'code') {
+              align = 'justify-start';
+              bubbleStyle = 'bg-gradient-to-r from-gray-900 to-gray-800 text-green-400 border border-gray-700/30';
+            }
 
-          return (
-            <div key={idx} className={`flex ${align}`}>
-              <div className={`max-w-[85%] rounded-2xl p-4 shadow-lg ${bubbleStyle}`}>
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-6 h-6 rounded-full flex items-center justify-center bg-black/20">
-                    {msg.kind === 'user' && <User className="w-4 h-4" />}
-                    {msg.kind === 'assistant' && <Bot className="w-4 h-4" />}
-                    {msg.kind === 'tool_call' && <Settings className="w-4 h-4" />}
-                    {msg.kind === 'tool_result' && <CheckCircle className="w-4 h-4" />}
-                    {msg.kind === 'code' && <Code className="w-4 h-4" />}
-                    {msg.kind === 'text' && <MessageSquare className="w-4 h-4" />}
-                  </div>
-                  <span className="font-medium capitalize text-sm">
-                    {msg.kind.replace('_', ' ')}
-                  </span>
-                  {msg.timestamp && (
-                    <span className="text-xs opacity-70 bg-black/20 px-2 py-1 rounded-full">
-                      {new Date(msg.timestamp).toLocaleTimeString()}
+            return (
+              <div key={`${msgIdx}-${chunkIdx}`} className={`flex ${align}`}>
+                <div className={`max-w-[85%] rounded-2xl p-4 shadow-lg ${bubbleStyle}`}>
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-6 h-6 rounded-full flex items-center justify-center bg-black/20">
+                      {chunk.role === Role.USER && <User className="w-4 h-4" />}
+                      {chunk.role === Role.ASSISTANT && <Bot className="w-4 h-4" />}
+                      {chunk.kind === ChunkKind.TOOL_CALL && <Settings className="w-4 h-4" />}
+                      {chunk.kind === ChunkKind.TOOL_RESULT && <CheckCircle className="w-4 h-4" />}
+                      {chunk.kind === ChunkKind.CONTENT && chunk.metadata?.subtype === 'code' && <Code className="w-4 h-4" />}
+                      {chunk.kind === ChunkKind.CONTENT && !chunk.metadata?.subtype && <MessageSquare className="w-4 h-4" />}
+                    </div>
+                    <span className="font-medium capitalize text-sm">
+                      {/* Show kind as label */}
+                      {chunk.kind === ChunkKind.CONTENT && chunk.metadata?.subtype === 'code'
+                        ? 'code'
+                        : ChunkKind[chunk.kind]?.replace('_', ' ').toLowerCase()}
                     </span>
+                    {chunk.timestamp && (
+                      <span className="text-xs opacity-70 bg-black/20 px-2 py-1 rounded-full">
+                        {new Date(chunk.timestamp).toLocaleTimeString()}
+                      </span>
+                    )}
+                  </div>
+                  {/* Message content */}
+                  {chunk.kind === ChunkKind.TOOL_CALL && toolCallData ? (
+                    <div>
+                      <div className="mb-1 text-xs text-gray-400">Tool Call: <span className="font-bold text-green-300">{toolCallData.tool_name || 'Unknown'}</span></div>
+                      <div className="mb-1 text-xs text-gray-400">Parameters: <span className="text-gray-300">{JSON.stringify(toolCallData.parameters, null, 2)}</span></div>
+                      <div className="mb-1 text-xs text-gray-400">Python Code:</div>
+                      <pre className="text-xs text-blue-300 bg-gray-900/60 p-2 rounded border border-gray-700/50 font-mono overflow-x-auto">{toolCallData.python_code}</pre>
+                    </div>
+                  ) : chunk.kind === ChunkKind.TOOL_RESULT ? (
+                    <div>
+                      <div className="mb-1 text-xs text-gray-400">Result:</div>
+                      <pre className="text-xs text-gray-300 bg-gray-900/60 p-2 rounded border border-gray-700/50 font-mono overflow-x-auto">{chunk.text}</pre>
+                    </div>
+                  ) : chunk.kind === ChunkKind.CONTENT && chunk.metadata?.subtype === 'code' ? (
+                    <pre className="bg-gray-900 text-green-400 p-3 rounded text-sm overflow-x-auto">
+                      <code>{chunk.text}</code>
+                    </pre>
+                  ) : (
+                    <p className="whitespace-pre-wrap leading-relaxed">{chunk.text}</p>
+                  )}
+                  {/* Metadata */}
+                  {chunk.metadata && Object.keys(chunk.metadata).length > 0 && (
+                    <div className="mt-2 text-xs text-gray-500">
+                      <strong>Metadata:</strong> {JSON.stringify(chunk.metadata, null, 2)}
+                    </div>
                   )}
                 </div>
-                {/* Message content */}
-                {msg.kind === 'tool_call' && toolCallData ? (
-                  <div>
-                    <div className="mb-1 text-xs text-gray-400">Tool Call: <span className="font-bold text-green-300">{toolCallData.tool_name || 'Unknown'}</span></div>
-                    <div className="mb-1 text-xs text-gray-400">Parameters: <span className="text-gray-300">{JSON.stringify(toolCallData.parameters, null, 2)}</span></div>
-                    <div className="mb-1 text-xs text-gray-400">Python Code:</div>
-                    <pre className="text-xs text-blue-300 bg-gray-900/60 p-2 rounded border border-gray-700/50 font-mono overflow-x-auto">{toolCallData.python_code}</pre>
-                  </div>
-                ) : msg.kind === 'tool_result' ? (
-                  <div>
-                    <div className="mb-1 text-xs text-gray-400">Result:</div>
-                    <pre className="text-xs text-gray-300 bg-gray-900/60 p-2 rounded border border-gray-700/50 font-mono overflow-x-auto">{msg.content}</pre>
-                  </div>
-                ) : msg.kind === 'code' ? (
-                  <pre className="bg-gray-900 text-green-400 p-3 rounded text-sm overflow-x-auto">
-                    <code>{msg.content}</code>
-                  </pre>
-                ) : (
-                  <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
-                )}
-                {/* Metadata */}
-                {msg.metadata && Object.keys(msg.metadata).length > 0 && (
-                  <div className="mt-2 text-xs text-gray-500">
-                    <strong>Metadata:</strong> {JSON.stringify(msg.metadata, null, 2)}
-                  </div>
-                )}
               </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
     )}
   </ScrollArea>
+
+
 
 
 
