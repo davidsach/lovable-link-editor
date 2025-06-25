@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -6,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Save, Loader2 } from 'lucide-react';
-import { Content } from '../../types/toolTrainer';
+import { Content, ChunkKind } from '../../types/toolTrainer';
 
 interface SaveToDatabaseProps {
   messages: Content[];
@@ -34,22 +33,32 @@ export const SaveToDatabase: React.FC<SaveToDatabaseProps> = ({
     }
   }, [isOpen, exampleName, tags]);
 
-
   const handleSave = async () => {
     setIsSaving(true);
 
     try {
-      // Prepare the payload to match the new backend structure
+      // Filter out chunks with empty or missing text
+      const filteredMessages = messages
+        .map(content => ({
+          ...content,
+          chunks: content.chunks.filter(chunk =>
+            chunk.text && chunk.text.trim() !== ''
+          )
+        }))
+        .filter(content => content.chunks.length > 0); // Remove empty messages
+
       const payload = {
         name: name || `Example ${Date.now()}`,
         description: description || '',
-        messages: messages,
+        messages: filteredMessages,
         meta: {
           tags: localTags,
           created_by: 'user',
           source: 'tool_trainer'
         }
       };
+
+      console.log('Payload being sent:', JSON.stringify(payload, null, 2));
 
       console.log('Saving to database with new structure:', payload);
 
@@ -67,7 +76,7 @@ export const SaveToDatabase: React.FC<SaveToDatabaseProps> = ({
       const savedExample = await response.json();
       console.log('Example saved successfully with new structure:', savedExample);
       setIsOpen(false);
-      
+
       // Reset form
       setName('');
       setDescription('');
@@ -91,7 +100,7 @@ export const SaveToDatabase: React.FC<SaveToDatabaseProps> = ({
           Save to DB
         </Button>
       </DialogTrigger>
-      
+
       <DialogContent
         className="bg-gray-800 border-gray-600 text-white max-w-2xl"
         aria-describedby="save-to-db-description"
@@ -122,16 +131,26 @@ export const SaveToDatabase: React.FC<SaveToDatabaseProps> = ({
               className="bg-gray-700 border-gray-600 text-white min-h-[60px]"
             />
           </div>
-          
+
           <div className="space-y-2">
-            <Label htmlFor="messages_preview" className="text-gray-300">Messages ({messages.length})</Label>
+            <Label htmlFor="messages_preview" className="text-gray-300">
+              Messages (chunks: {messages.reduce((acc, msg) => acc + (msg.chunks?.length || 0), 0)})
+            </Label>
             <div className="bg-gray-700 border border-gray-600 rounded p-3 max-h-32 overflow-y-auto">
               {messages.length > 0 ? (
-                messages.map((msg, idx) => (
-                  <div key={idx} className="text-xs text-gray-300 mb-1">
-                    <span className="font-medium text-purple-400">{msg.kind}:</span> {msg.content.substring(0, 100)}...
-                  </div>
-                ))
+                messages.flatMap((msg, mIdx) =>
+                  msg.chunks.map((chunk, cIdx) => (
+                    <div key={`${mIdx}-${cIdx}`} className="text-xs text-gray-300 mb-1">
+                      <span className="font-medium text-purple-400">
+                        {typeof chunk.kind === 'number'
+                          ? (ChunkKind[chunk.kind] || 'CONTENT')
+                          : (chunk.kind || 'CONTENT')}
+                      </span>
+                      : {chunk.text ? chunk.text.substring(0, 100) : ''}
+                      ...
+                    </div>
+                  ))
+                )
               ) : (
                 <span className="text-gray-500">No messages to save</span>
               )}
@@ -162,7 +181,7 @@ export const SaveToDatabase: React.FC<SaveToDatabaseProps> = ({
               )}
               {isSaving ? 'Saving...' : 'Save to Database'}
             </Button>
-            
+
             <Button
               onClick={() => setIsOpen(false)}
               variant="outline"
