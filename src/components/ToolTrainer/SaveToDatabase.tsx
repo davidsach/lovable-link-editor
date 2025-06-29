@@ -64,9 +64,13 @@ export const SaveToDatabase: React.FC<SaveToDatabaseProps> = ({
 
       const response = await fetch('http://127.0.0.1:8000/examples/', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer abcd', 
+        },
         body: JSON.stringify(payload),
       });
+      
 
       if (!response.ok) {
         const errorData = await response.text();

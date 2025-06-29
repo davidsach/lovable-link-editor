@@ -1,4 +1,3 @@
-
 import { Example } from '../types/toolTrainer';
 
 interface PythonExecutionRequest {
@@ -56,6 +55,7 @@ class ConversationService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': 'Bearer abcd', // <-- Added Authorization header
         },
         body: JSON.stringify({ code: request.code })
       });
