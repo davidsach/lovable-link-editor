@@ -49,6 +49,7 @@ export const EditExample: React.FC<EditExampleProps> = ({
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': 'Bearer abcd',
         },
         body: JSON.stringify(updatedData),
       });

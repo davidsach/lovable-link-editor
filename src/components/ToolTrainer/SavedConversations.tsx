@@ -28,7 +28,12 @@ export const SavedConversations: React.FC<SavedConversationsProps> = ({ onLoadCo
 
   const loadConversations = async () => {
     try {
-      const response = await fetch('http://127.0.0.1:8000/examples/');
+      const response = await fetch('http://127.0.0.1:8000/examples/', {
+        headers: {
+          'Authorization': 'Bearer abcd',
+        },
+      });
+      
       if (!response.ok) throw new Error('Failed to fetch examples');
       const data = await response.json();
       setSavedConversations(data);
@@ -41,7 +46,10 @@ export const SavedConversations: React.FC<SavedConversationsProps> = ({ onLoadCo
   const handleDelete = async (id: number) => {
     try {
       const response = await fetch(`http://127.0.0.1:8000/examples/${id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: {
+          'Authorization': 'Bearer abcd',
+        },
       });
       if (!response.ok) throw new Error('Failed to delete example');
       loadConversations();
@@ -51,6 +59,7 @@ export const SavedConversations: React.FC<SavedConversationsProps> = ({ onLoadCo
       setDeleteConfirmation({ open: false, id: null });
     }
   };
+  
 
   const exportConversation = (conversation: Example) => {
     const dataStr = JSON.stringify(conversation, null, 2);

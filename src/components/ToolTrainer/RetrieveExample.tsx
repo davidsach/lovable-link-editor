@@ -29,7 +29,11 @@ export const RetrieveExample: React.FC<RetrieveExampleProps> = ({
     try {
       console.log('Retrieving example with ID:', exampleId);
       
-      const response = await fetch(`http://127.0.0.1:8000/examples/${exampleId}`);
+      const response = await fetch(`http://127.0.0.1:8000/examples/${exampleId}`, {
+        headers: {
+          'Authorization': 'Bearer abcd',
+        },
+      });
       
       if (!response.ok) {
         throw new Error(`Failed to retrieve example: ${response.status}`);
@@ -52,7 +56,12 @@ export const RetrieveExample: React.FC<RetrieveExampleProps> = ({
     try {
       console.log('Retrieving all examples...');
       
-      const response = await fetch('http://127.0.0.1:8000/examples/');
+      const response = await fetch('http://127.0.0.1:8000/examples/', {
+        headers: {
+          'Authorization': 'Bearer abcd',
+        },
+      });
+      
       
       if (!response.ok) {
         throw new Error(`Failed to retrieve examples: ${response.status}`);
