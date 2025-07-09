@@ -393,6 +393,72 @@ const ToolTrainer = () => {
     }
   };
 
+  // Handler for editing tool results in the summary area
+  const handleEditToolResult = (result, newText) => {
+    setConversation((prev) => {
+      const newMessages = prev.messages.map((msg) => ({
+        ...msg,
+        chunks: msg.chunks.map((chunk) => {
+          if (
+            chunk.kind === ChunkKind.TOOL_RESULT &&
+            chunk.metadata?.tool_id === result.metadata?.tool_id
+          ) {
+            return { ...chunk, text: newText };
+          }
+          return chunk;
+        }),
+      }));
+      return {
+        ...prev,
+        messages: newMessages,
+        updatedAt: new Date(),
+      };
+    });
+  };
+
+  const handleEditChunkText = (msgIdx, chunkIdx, newText) => {
+    setConversation((prev) => {
+      const newMessages = [...prev.messages];
+      const message = { ...newMessages[msgIdx] };
+      const chunks = [...message.chunks];
+      const chunk = { ...chunks[chunkIdx] };
+      chunk.text = newText;
+      chunks[chunkIdx] = chunk;
+      message.chunks = chunks;
+      newMessages[msgIdx] = message;
+      return {
+        ...prev,
+        messages: newMessages,
+        updatedAt: new Date(),
+      };
+    });
+  };
+
+  // index: the index of the toolCall in toolCalls array
+  // newResult: the new edited tool result string
+  const handleToolResultEdit = (index, newResult) => {
+    // 1. Update toolCalls array as before
+    updateToolCall(index, { result: newResult });
+
+    // 2. Also sync the edit into conversation.messages
+    setConversation((prev) => {
+      const toolCallId = toolCalls[index].id; // or use another unique identifier
+      const newMessages = prev.messages.map((msg) => ({
+        ...msg,
+        chunks: msg.chunks.map((chunk) => {
+          if (
+            chunk.kind === ChunkKind.TOOL_RESULT &&
+            chunk.metadata?.tool_id === toolCallId
+          ) {
+            return { ...chunk, text: newResult };
+          }
+          return chunk;
+        }),
+      }));
+      return { ...prev, messages: newMessages, updatedAt: new Date() };
+    });
+  };
+
   // Handle getting all tools from backend
   const handleGetAllTools = async () => {
     try {
@@ -1355,9 +1421,16 @@ const ToolTrainer = () => {
                               <div className="text-xs text-gray-400 mb-1">
                                 Result:
                               </div>
-                              <pre className="text-xs text-gray-300 bg-gray-900/60 p-2 rounded border border-gray-700/50 font-mono overflow-x-auto max-h-32 overflow-y-auto">
-                                {result.text}
-                              </pre>
+                              <textarea
+                                className="text-xs text-gray-300 bg-gray-900/60 p-2 rounded border border-gray-700/50 font-mono overflow-x-auto w-full max-h-32"
+                                value={result.text}
+                                onChange={(e) => {
+                                  // Find the corresponding message and chunk in conversation state and update
+                                  // You may need to pass in the right indices or tool_id for this
+                                  handleEditToolResult(result, e.target.value);
+                                }}
+                                rows={4}
+                              />
                             </div>
                           )}
                         </div>
@@ -1526,47 +1599,58 @@ const ToolTrainer = () => {
                             )}
                           </div>
                           {/* Message content */}
-                          {chunk.kind === ChunkKind.TOOL_CALL &&
-                          toolCallData ? (
-                            <div>
-                              <div className="mb-1 text-xs text-gray-400">
-                                Tool Call:{" "}
-                                <span className="font-bold text-green-300">
-                                  {toolCallData.tool_name || "Unknown"}
-                                </span>
-                              </div>
-                              <div className="mb-1 text-xs text-gray-400">
-                                Parameters:{" "}
-                                <span className="text-gray-300">
-                                  {JSON.stringify(
-                                    toolCallData.parameters,
-                                    null,
-                                    2
-                                  )}
-                                </span>
-                              </div>
-                              <div className="mb-1 text-xs text-gray-400">
-                                Python Code:
-                              </div>
-                              <pre className="text-xs text-blue-300 bg-gray-900/60 p-2 rounded border border-gray-700/50 font-mono overflow-x-auto">
-                                {toolCallData.python_code}
-                              </pre>
-                            </div>
-                          ) : chunk.kind === ChunkKind.TOOL_RESULT ? (
-                            <div>
-                              <div className="mb-1 text-xs text-gray-400">
-                                Result:
-                              </div>
-                              <pre className="text-xs text-gray-300 bg-gray-900/60 p-2 rounded border border-gray-700/50 font-mono overflow-x-auto">
-                                {chunk.text}
-                              </pre>
-                            </div>
-                          ) : chunk.kind === ChunkKind.CONTENT &&
-                            chunk.metadata?.subtype === "code" ? (
-                            <pre className="bg-gray-900 text-green-400 p-3 rounded text-sm overflow-x-auto">
-                              <code>{chunk.text}</code>
-                            </pre>
+                          {chunk.kind === ChunkKind.TOOL_CALL ? (
+                            // Editable TOOL_CALL (edit raw JSON or string)
+                            <textarea
+                              className="text-xs text-green-300 bg-gray-900/60 p-2 rounded border border-gray-700/50 font-mono overflow-x-auto w-full"
+                              value={chunk.text}
+                              onChange={(e) =>
+                                handleEditChunkText(
+                                  msgIdx,
+                                  chunkIdx,
+                                  e.target.value
+                                )
+                              }
+                              rows={6}
+                            />
+                          ) : chunk.kind === ChunkKind.TOOL_RESULT ||
+                            (chunk.kind === ChunkKind.CONTENT &&
+                              chunk.metadata?.subtype === "code") ? (
+                            // Editable for TOOL_RESULT and code CONTENT
+                            <textarea
+                              className={
+                                chunk.kind === ChunkKind.TOOL_RESULT
+                                  ? "text-xs text-gray-300 bg-gray-900/60 p-2 rounded border border-gray-700/50 font-mono overflow-x-auto w-full"
+                                  : "bg-gray-900 text-green-400 p-3 rounded text-sm w-full font-mono"
+                              }
+                              value={chunk.text}
+                              onChange={(e) =>
+                                handleEditChunkText(
+                                  msgIdx,
+                                  chunkIdx,
+                                  e.target.value
+                                )
+                              }
+                              rows={
+                                chunk.kind === ChunkKind.TOOL_RESULT ? 4 : 6
+                              }
+                            />
+                          ) : chunk.kind === ChunkKind.CONTENT ? (
+                            // Editable for normal CONTENT (user/assistant text)
+                            <textarea
+                              className="whitespace-pre-wrap leading-relaxed bg-gray-700/50 rounded p-2 w-full text-white"
+                              value={chunk.text}
+                              onChange={(e) =>
+                                handleEditChunkText(
+                                  msgIdx,
+                                  chunkIdx,
+                                  e.target.value
+                                )
+                              }
+                              rows={3}
+                            />
                           ) : (
+                            // Fallback for any other kind
                             <p className="whitespace-pre-wrap leading-relaxed">
                               {chunk.text}
                             </p>
@@ -1761,9 +1845,9 @@ const ToolTrainer = () => {
                       <Textarea
                         value={toolCall.result}
                         onChange={(e) =>
-                          updateToolCall(index, { result: e.target.value })
+                          handleToolResultEdit(index, e.target.value)
                         }
-                        placeholder="we can edit the tool result so that we are able to create examples for ground truth and making evals pipeline"
+                        placeholder="Edit tool result for ground truth and evals"
                         className="min-h-[100px] bg-gray-600/80 border-gray-500/50 text-white font-mono text-sm placeholder:text-gray-400 focus:border-blue-400/50 transition-colors"
                       />
                     </div>
@@ -1871,9 +1955,12 @@ const ToolTrainer = () => {
               Back
             </Button>
 
+            
+
             {/* Save to Database Button */}
             <div className="bg-purple-600 hover:bg-purple-700 rounded-md shadow-lg transition-all duration-200">
-              <SaveToDatabase
+              {
+                /* <SaveToDatabase
                 messages={syncToolResultsWithMessages(
                   conversation.messages,
                   toolCalls
@@ -1881,6 +1968,13 @@ const ToolTrainer = () => {
                 tags={conversation.meta?.tags || []}
                 exampleName={conversation.name}
               />
+               */
+                <SaveToDatabase
+                  messages={conversation.messages}
+                  tags={conversation.meta?.tags || []}
+                  exampleName={conversation.name}
+                />
+              }
             </div>
 
             {/* Retrieve Example Button */}
