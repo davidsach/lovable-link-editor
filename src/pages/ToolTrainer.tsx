@@ -867,44 +867,24 @@ const ToolTrainer = () => {
     setCurrentExampleId(currentExampleId + 1);
   };
 
-  const goBackStep = () => {
-    if (conversationHistory.length > 0) {
-      // Get the last saved state
-      const lastState = conversationHistory[conversationHistory.length - 1];
-
-      // Restore the conversation to the previous state
-      setConversation((prev) => ({
-        ...prev,
-        messages: [...lastState.messages], // Content[] structure
-        meta: { ...lastState.meta },
-      }));
-      setCurrentStep(lastState.step);
-
-      // Remove this state from history
-      setConversationHistory((prev) => prev.slice(0, -1));
-
-      // Reset current turn states
-      setShowTextChunkInput(false);
-      setMessageContent("");
-      setHasAddedTextChunk(false);
-    } else {
-      // If no history, go back to initial state
-      setConversation((prev) => ({
-        ...prev,
-        messages: [],
-        meta: { tags: [] },
-      }));
-      setCurrentStep("user");
-      setConversationStarted(false);
-      setShowTextChunkInput(false);
-      setMessageContent("");
-      setHasAddedTextChunk(false);
-    }
+  const canGoBackStep = () => {
+    return conversation.messages.length > 0;
   };
 
-  const goBack = () => {
-    // Navigate back to previous page
-    window.history.back();
+  const goBackStep = () => {
+    setConversation((prev) => {
+      // Remove only the most recent chunk (last message)
+      const newMessages = prev.messages.slice(0, -1);
+      return {
+        ...prev,
+        messages: newMessages,
+      };
+    });
+
+    // Optionally update other UI states as needed
+    setShowTextChunkInput(false);
+    setMessageContent("");
+    setHasAddedTextChunk(false);
   };
 
   // =============================================================================
@@ -966,10 +946,6 @@ const ToolTrainer = () => {
       toolCalls.some((tc) => tc.pythonCode.trim()) &&
       !executeAllToolsMutation.isPending
     );
-  };
-
-  const canGoBackStep = () => {
-    return conversationHistory.length > 0 || conversation.messages.length > 0;
   };
 
   // =============================================================================
@@ -1944,18 +1920,6 @@ const ToolTrainer = () => {
               <Undo className="w-4 h-4 mr-2" />
               Back Step
             </Button>
-
-            {/* Back Button */}
-            <Button
-              onClick={goBack}
-              variant="outline"
-              className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 hover:border-blue-400 shadow-lg transition-all duration-200 px-6 h-11 font-medium border-0"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back
-            </Button>
-
-            
 
             {/* Save to Database Button */}
             <div className="bg-purple-600 hover:bg-purple-700 rounded-md shadow-lg transition-all duration-200">
