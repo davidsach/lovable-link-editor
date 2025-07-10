@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { AlertTriangle, Play, Trash2, Loader2, CheckCircle } from 'lucide-react';
-import { useToolSchema, useExecuteTool } from '@/hooks/useApi';
+import { useToolSchema, useExecuteToolResult } from '@/hooks/useApi';
 import { Tool } from '@/services/api';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -40,7 +40,7 @@ export const ToolCallStep: React.FC<ToolCallStepProps> = ({
   hasErrors = false
 }) => {
   const { data: toolSchema, isLoading: schemaLoading } = useToolSchema(toolName);
-  const executeToolMutation = useExecuteTool();
+  const executeToolMutation = useExecuteToolResult();
   const [localParameters, setLocalParameters] = useState(parameters);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
@@ -85,8 +85,7 @@ export const ToolCallStep: React.FC<ToolCallStepProps> = ({
     
     try {
       const result = await executeToolMutation.mutateAsync({
-        tool_name: toolName,
-        parameters: localParameters
+        code: `print(${toolName}(${JSON.stringify(localParameters)}))`
       });
       
       // Safely handle the result

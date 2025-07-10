@@ -245,6 +245,8 @@ const ToolTrainer = () => {
   const [showTextChunkInput, setShowTextChunkInput] = useState(false);
   const [messageContent, setMessageContent] = useState("");
   const [showAllResults, setShowAllResults] = useState(false);
+  const [showToolEditor, setShowToolEditor] = useState(false);
+  const [editingConversation, setEditingConversation] = useState(false);
 
   // Turn management
   const [currentStep, setCurrentStep] = useState<"user" | "assistant">("user");
@@ -601,6 +603,7 @@ const ToolTrainer = () => {
     };
 
     setToolCalls([...toolCalls, newToolCall]);
+    setShowToolEditor(true); // Show tool editor when adding a tool call
   };
 
   const updateToolCall = (index: number, updates: Partial<ToolCall>) => {
@@ -665,6 +668,9 @@ const ToolTrainer = () => {
         ],
         updatedAt: new Date(),
       }));
+
+      // Hide tool editor after successful execution
+      setShowToolEditor(false);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Execution failed";
@@ -711,6 +717,9 @@ const ToolTrainer = () => {
         ],
         updatedAt: new Date(),
       }));
+
+      // Hide tool editor after failed execution
+      setShowToolEditor(false);
     }
   };
 
@@ -794,8 +803,8 @@ const ToolTrainer = () => {
         }));
       });
 
-      // Show all results section after execution
-      setShowAllResults(true);
+      // Hide tool editor and show results in conversation area after execution
+      setShowToolEditor(false);
     } catch (error) {
       // Set all executing tool calls to failed status
       toolCallsWithCode.forEach((toolCall) => {
@@ -851,6 +860,10 @@ const ToolTrainer = () => {
 
   const removeToolCall = (index: number) => {
     setToolCalls((prev) => prev.filter((_, i) => i !== index));
+    // Hide tool editor if no tool calls remain
+    if (toolCalls.length <= 1) {
+      setShowToolEditor(false);
+    }
   };
 
   // =============================================================================
@@ -994,6 +1007,50 @@ const ToolTrainer = () => {
       ),
     }));
   }, [conversation.messages]);
+
+  // Handler for executing edited conversation
+  const handleExecuteEditedConversation = async () => {
+    // Get all tool calls from the conversation messages
+    const allChunks = conversation.messages.flatMap((m) => m.chunks);
+    const toolCallChunks = allChunks.filter(
+      (chunk) => chunk.kind === ChunkKind.TOOL_CALL
+    );
+    
+    // Re-execute all tool calls
+    for (const toolCallChunk of toolCallChunks) {
+      try {
+        const toolData = JSON.parse(toolCallChunk.text);
+        const result = await executeToolMutation.mutateAsync({
+          code: toolData.python_code,
+        });
+
+        const formattedResult =
+          typeof result.code_output === "object"
+            ? JSON.stringify(result.code_output, null, 2)
+            : String(result.code_output);
+
+        // Update the corresponding result chunk
+        setConversation((prev) => ({
+          ...prev,
+          messages: prev.messages.map((msg) => ({
+            ...msg,
+            chunks: msg.chunks.map((chunk) => {
+              if (
+                chunk.kind === ChunkKind.TOOL_RESULT &&
+                chunk.metadata?.tool_id === toolCallChunk.metadata?.tool_id
+              ) {
+                return { ...chunk, text: formattedResult };
+              }
+              return chunk;
+            }),
+          })),
+          updatedAt: new Date(),
+        }));
+      } catch (error) {
+        console.error("Failed to execute tool call:", error);
+      }
+    }
+  };
 
   // =============================================================================
   // RENDER
@@ -1308,116 +1365,6 @@ const ToolTrainer = () => {
           </Card>
         </div>
 
-        {showAllResults && toolCallPairs.length > 0 && (
-          <div className="border-b border-gray-700/50 bg-gradient-to-r from-gray-800/90 to-gray-700/90 backdrop-blur">
-            <div className="p-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-white flex items-center">
-                  <Download className="w-5 h-5 mr-2 text-green-400" />
-                  All Tool Call Results
-                </h3>
-                <Button
-                  onClick={() => setShowAllResults(false)}
-                  variant="ghost"
-                  size="sm"
-                  className="text-gray-400 hover:text-white hover:bg-gray-700/50"
-                >
-                  Hide Results
-                </Button>
-              </div>
-              <div className="h-96 overflow-hidden">
-                <ScrollArea className="h-full w-full">
-                  <div className="space-y-3 pr-4">
-                    {toolCallPairs.map(({ call, result }, index) => {
-                      let callData: any = {};
-                      try {
-                        callData = call.text ? JSON.parse(call.text) : {};
-                      } catch {
-                        callData = {};
-                      }
-                      return (
-                        <div
-                          key={call.metadata?.tool_id || index}
-                          className="bg-gradient-to-r from-gray-700/80 to-gray-600/80 rounded-lg p-4 border border-gray-600/50"
-                        >
-                          <div className="flex items-center gap-3 mb-3">
-                            <Badge
-                              variant="outline"
-                              className="bg-blue-500/20 text-blue-300 border-blue-400/50"
-                            >
-                              #{index + 1}
-                            </Badge>
-                            <span className="text-sm font-medium text-white">
-                              {callData.tool_name || "Unknown Tool"}
-                            </span>
-                            <Badge
-                              variant={
-                                result?.metadata?.status === "completed"
-                                  ? "default"
-                                  : result?.metadata?.status === "failed"
-                                  ? "destructive"
-                                  : result?.metadata?.status === "executing"
-                                  ? "secondary"
-                                  : "outline"
-                              }
-                              className={`text-xs ${
-                                result?.metadata?.status === "completed"
-                                  ? "bg-green-500/20 text-green-300 border-green-400/50"
-                                  : result?.metadata?.status === "failed"
-                                  ? "bg-red-500/20 text-red-300 border-red-400/50"
-                                  : result?.metadata?.status === "executing"
-                                  ? "bg-yellow-500/20 text-yellow-300 border-yellow-400/50"
-                                  : "bg-gray-500/20 text-gray-300 border-gray-400/50"
-                              }`}
-                            >
-                              {result?.metadata?.status === "executing" && (
-                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                              )}
-                              {result?.metadata?.status === "completed" && (
-                                <CheckCircle className="w-3 h-3 mr-1" />
-                              )}
-                              {result?.metadata?.status === "failed" && (
-                                <AlertTriangle className="w-3 h-3 mr-1" />
-                              )}
-                              {result?.metadata?.status || "pending"}
-                            </Badge>
-                          </div>
-                          {callData.python_code && (
-                            <div className="mb-3">
-                              <div className="text-xs text-gray-400 mb-1">
-                                Code:
-                              </div>
-                              <pre className="text-xs text-blue-300 bg-gray-900/60 p-2 rounded border border-gray-700/50 font-mono overflow-x-auto">
-                                {callData.python_code}
-                              </pre>
-                            </div>
-                          )}
-                          {result?.text && (
-                            <div>
-                              <div className="text-xs text-gray-400 mb-1">
-                                Result:
-                              </div>
-                              <textarea
-                                className="text-xs text-gray-300 bg-gray-900/60 p-2 rounded border border-gray-700/50 font-mono overflow-x-auto w-full max-h-32"
-                                value={result.text}
-                                onChange={(e) => {
-                                  // Find the corresponding message and chunk in conversation state and update
-                                  // You may need to pass in the right indices or tool_id for this
-                                  handleEditToolResult(result, e.target.value);
-                                }}
-                                rows={4}
-                              />
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </ScrollArea>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Main conversation area */}
         <div className="flex-1 flex flex-col bg-gradient-to-b from-gray-900/50 to-gray-800/50">
@@ -1460,7 +1407,7 @@ const ToolTrainer = () => {
             </div>
           </div>
 
-          {/* Conversation Messages */}
+          {/* Conversation Messages with Execute Button */}
           <ScrollArea className="flex-1 p-6">
             {!conversation.messages || conversation.messages.length === 0 ? (
               <div className="flex items-center justify-center h-full text-gray-400">
@@ -1483,6 +1430,22 @@ const ToolTrainer = () => {
                 </div>
               </div>
             ) : (
+              <div className="space-y-4">
+                {/* Execute Button for edited conversation */}
+                <div className="flex justify-center mb-6">
+                  <Button
+                    onClick={handleExecuteEditedConversation}
+                    disabled={executeToolMutation.isPending}
+                    className="bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600 text-white font-medium shadow-lg transition-all duration-200 px-8 h-12"
+                  >
+                    {executeToolMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Play className="w-4 h-4 mr-2" />
+                    )}
+                    Execute Updated Conversation
+                  </Button>
+                </div>
               <div className="space-y-6">
                 {conversation.messages.map((msg, msgIdx) =>
                   msg.chunks.map((chunk, chunkIdx) => {
@@ -1644,6 +1607,7 @@ const ToolTrainer = () => {
                     );
                   })
                 )}
+                </div>
               </div>
             )}
           </ScrollArea>
@@ -1689,8 +1653,8 @@ const ToolTrainer = () => {
             </div>
           )}
 
-          {/* Tool Call Editors - Show when there are tool calls */}
-          {currentStep === "assistant" && toolCalls.length > 0 && (
+          {/* Tool Call Editors - Show when there are tool calls and editor is visible */}
+          {currentStep === "assistant" && toolCalls.length > 0 && showToolEditor && (
             <div className="border-t border-gray-700/50 bg-gradient-to-r from-gray-800/90 to-gray-700/90 backdrop-blur p-6 shadow-lg max-h-96 overflow-y-auto">
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
