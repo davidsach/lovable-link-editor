@@ -749,6 +749,9 @@ const ToolTrainer = () => {
         code_chunks: codeChunks,
       });
 
+      // Collect all new chunks to add at once to prevent duplicates
+      const newChunks: Chunk[] = [];
+
       result.code_chunk_output.forEach((output) => {
         const toolCall = toolCallsWithCode[output.chunk_id];
         const originalIndex = toolCalls.findIndex(
@@ -765,43 +768,75 @@ const ToolTrainer = () => {
           status: "completed",
         });
 
-        // ✅ Add tool_call and tool_result as Content messages with proper Chunk structure
-        const toolCallChunk: Chunk = {
-          text: JSON.stringify({
-            tool_name: toolCall.toolName,
-            parameters: toolCall.parameters,
-            python_code: toolCall.pythonCode,
-          }),
-          kind: ChunkKind.TOOL_CALL,
-          role: Role.ASSISTANT,
-          metadata: {
-            tool_id: toolCall.id,
-            status: "completed",
-          },
-          timestamp: new Date().toISOString(),
-        };
+        // Check if tool call already exists in conversation to prevent duplicates
+        const allChunks = conversation.messages.flatMap((m) => m.chunks);
+        const existingToolCall = allChunks.find(
+          (chunk) => 
+            chunk.kind === ChunkKind.TOOL_CALL && 
+            chunk.metadata?.tool_id === toolCall.id
+        );
 
-        const toolResultChunk: Chunk = {
-          text: formattedResult,
-          kind: ChunkKind.TOOL_RESULT,
-          role: Role.ASSISTANT,
-          metadata: {
-            tool_id: toolCall.id,
-            status: "completed",
-          },
-          timestamp: new Date().toISOString(),
-        };
+        // Only add tool call and result if they don't already exist
+        if (!existingToolCall) {
+          const toolCallChunk: Chunk = {
+            text: JSON.stringify({
+              tool_name: toolCall.toolName,
+              parameters: toolCall.parameters,
+              python_code: toolCall.pythonCode,
+            }),
+            kind: ChunkKind.TOOL_CALL,
+            role: Role.ASSISTANT,
+            metadata: {
+              tool_id: toolCall.id,
+              status: "completed",
+            },
+            timestamp: new Date().toISOString(),
+          };
 
+          const toolResultChunk: Chunk = {
+            text: formattedResult,
+            kind: ChunkKind.TOOL_RESULT,
+            role: Role.ASSISTANT,
+            metadata: {
+              tool_id: toolCall.id,
+              status: "completed",
+            },
+            timestamp: new Date().toISOString(),
+          };
+
+          newChunks.push(toolCallChunk, toolResultChunk);
+        } else {
+          // Update existing result if tool call already exists
+          setConversation((prev) => ({
+            ...prev,
+            messages: prev.messages.map((msg) => ({
+              ...msg,
+              chunks: msg.chunks.map((chunk) => {
+                if (
+                  chunk.kind === ChunkKind.TOOL_RESULT &&
+                  chunk.metadata?.tool_id === toolCall.id
+                ) {
+                  return { ...chunk, text: formattedResult };
+                }
+                return chunk;
+              }),
+            })),
+            updatedAt: new Date(),
+          }));
+        }
+      });
+
+      // Add all new chunks at once
+      if (newChunks.length > 0) {
         setConversation((prev) => ({
           ...prev,
           messages: [
             ...prev.messages,
-            { chunks: [toolCallChunk] },
-            { chunks: [toolResultChunk] },
+            ...newChunks.map(chunk => ({ chunks: [chunk] })),
           ],
           updatedAt: new Date(),
         }));
-      });
+      }
 
       // Hide tool editor and show results in conversation area after execution
       setShowToolEditor(false);
@@ -818,42 +853,51 @@ const ToolTrainer = () => {
           status: "failed",
         });
 
-        // Add failed tool_call and tool_result as Content messages
-        const toolCallChunk: Chunk = {
-          text: JSON.stringify({
-            tool_name: toolCall.toolName,
-            parameters: toolCall.parameters,
-            python_code: toolCall.pythonCode,
-          }),
-          kind: ChunkKind.TOOL_CALL,
-          role: Role.ASSISTANT,
-          metadata: {
-            tool_id: toolCall.id,
-            status: "failed",
-          },
-          timestamp: new Date().toISOString(),
-        };
+        // Check if tool call already exists to prevent duplicates
+        const allChunks = conversation.messages.flatMap((m) => m.chunks);
+        const existingToolCall = allChunks.find(
+          (chunk) => 
+            chunk.kind === ChunkKind.TOOL_CALL && 
+            chunk.metadata?.tool_id === toolCall.id
+        );
 
-        const toolResultChunk: Chunk = {
-          text: `Error: ${errorMessage}`,
-          kind: ChunkKind.TOOL_RESULT,
-          role: Role.ASSISTANT,
-          metadata: {
-            tool_id: toolCall.id,
-            status: "failed",
-          },
-          timestamp: new Date().toISOString(),
-        };
+        if (!existingToolCall) {
+          const toolCallChunk: Chunk = {
+            text: JSON.stringify({
+              tool_name: toolCall.toolName,
+              parameters: toolCall.parameters,
+              python_code: toolCall.pythonCode,
+            }),
+            kind: ChunkKind.TOOL_CALL,
+            role: Role.ASSISTANT,
+            metadata: {
+              tool_id: toolCall.id,
+              status: "failed",
+            },
+            timestamp: new Date().toISOString(),
+          };
 
-        setConversation((prev) => ({
-          ...prev,
-          messages: [
-            ...prev.messages,
-            { chunks: [toolCallChunk] },
-            { chunks: [toolResultChunk] },
-          ],
-          updatedAt: new Date(),
-        }));
+          const toolResultChunk: Chunk = {
+            text: `Error: ${errorMessage}`,
+            kind: ChunkKind.TOOL_RESULT,
+            role: Role.ASSISTANT,
+            metadata: {
+              tool_id: toolCall.id,
+              status: "failed",
+            },
+            timestamp: new Date().toISOString(),
+          };
+
+          setConversation((prev) => ({
+            ...prev,
+            messages: [
+              ...prev.messages,
+              { chunks: [toolCallChunk] },
+              { chunks: [toolResultChunk] },
+            ],
+            updatedAt: new Date(),
+          }));
+        }
       });
     }
   };
@@ -1008,6 +1052,41 @@ const ToolTrainer = () => {
     }));
   }, [conversation.messages]);
 
+  // Handler for executing individual tool call from conversation
+  const handleExecuteIndividualToolCall = async (toolCallChunk: Chunk) => {
+    try {
+      const toolData = JSON.parse(toolCallChunk.text);
+      const result = await executeToolMutation.mutateAsync({
+        code: toolData.python_code,
+      });
+
+      const formattedResult =
+        typeof result.code_output === "object"
+          ? JSON.stringify(result.code_output, null, 2)
+          : String(result.code_output);
+
+      // Update the corresponding result chunk
+      setConversation((prev) => ({
+        ...prev,
+        messages: prev.messages.map((msg) => ({
+          ...msg,
+          chunks: msg.chunks.map((chunk) => {
+            if (
+              chunk.kind === ChunkKind.TOOL_RESULT &&
+              chunk.metadata?.tool_id === toolCallChunk.metadata?.tool_id
+            ) {
+              return { ...chunk, text: formattedResult };
+            }
+            return chunk;
+          }),
+        })),
+        updatedAt: new Date(),
+      }));
+    } catch (error) {
+      console.error("Failed to execute tool call:", error);
+    }
+  };
+
   // Handler for executing edited conversation
   const handleExecuteEditedConversation = async () => {
     // Get all tool calls from the conversation messages
@@ -1018,37 +1097,7 @@ const ToolTrainer = () => {
     
     // Re-execute all tool calls
     for (const toolCallChunk of toolCallChunks) {
-      try {
-        const toolData = JSON.parse(toolCallChunk.text);
-        const result = await executeToolMutation.mutateAsync({
-          code: toolData.python_code,
-        });
-
-        const formattedResult =
-          typeof result.code_output === "object"
-            ? JSON.stringify(result.code_output, null, 2)
-            : String(result.code_output);
-
-        // Update the corresponding result chunk
-        setConversation((prev) => ({
-          ...prev,
-          messages: prev.messages.map((msg) => ({
-            ...msg,
-            chunks: msg.chunks.map((chunk) => {
-              if (
-                chunk.kind === ChunkKind.TOOL_RESULT &&
-                chunk.metadata?.tool_id === toolCallChunk.metadata?.tool_id
-              ) {
-                return { ...chunk, text: formattedResult };
-              }
-              return chunk;
-            }),
-          })),
-          updatedAt: new Date(),
-        }));
-      } catch (error) {
-        console.error("Failed to execute tool call:", error);
-      }
+      await handleExecuteIndividualToolCall(toolCallChunk);
     }
   };
 
@@ -1492,13 +1541,13 @@ const ToolTrainer = () => {
                     }
 
                     return (
-                      <div
-                        key={`${msgIdx}-${chunkIdx}`}
-                        className={`flex ${align}`}
-                      >
-                        <div
-                          className={`max-w-[85%] rounded-2xl p-4 shadow-lg ${bubbleStyle}`}
-                        >
+                         <div
+                         key={`${msgIdx}-${chunkIdx}`}
+                         className={`flex ${align}`}
+                       >
+                         <div
+                           className={`w-full rounded-2xl p-4 shadow-lg ${bubbleStyle}`}
+                         >
                           <div className="flex items-center gap-2 mb-3">
                             <div className="w-6 h-6 rounded-full flex items-center justify-center bg-black/20">
                               {chunk.role === Role.USER && (
@@ -1537,22 +1586,38 @@ const ToolTrainer = () => {
                               </span>
                             )}
                           </div>
-                          {/* Message content */}
-                          {chunk.kind === ChunkKind.TOOL_CALL ? (
-                            // Editable TOOL_CALL (edit raw JSON or string)
-                            <textarea
-                              className="text-xs text-green-300 bg-gray-900/60 p-2 rounded border border-gray-700/50 font-mono overflow-x-auto w-full"
-                              value={chunk.text}
-                              onChange={(e) =>
-                                handleEditChunkText(
-                                  msgIdx,
-                                  chunkIdx,
-                                  e.target.value
-                                )
-                              }
-                              rows={6}
-                            />
-                          ) : chunk.kind === ChunkKind.TOOL_RESULT ||
+                           {/* Message content */}
+                           {chunk.kind === ChunkKind.TOOL_CALL ? (
+                             <div className="space-y-3">
+                               {/* Editable TOOL_CALL (edit raw JSON or string) */}
+                               <textarea
+                                 className="text-xs text-green-300 bg-gray-900/60 p-2 rounded border border-gray-700/50 font-mono overflow-x-auto w-full"
+                                 value={chunk.text}
+                                 onChange={(e) =>
+                                   handleEditChunkText(
+                                     msgIdx,
+                                     chunkIdx,
+                                     e.target.value
+                                   )
+                                 }
+                                 rows={6}
+                               />
+                               {/* Execute individual tool call button */}
+                               <Button
+                                 onClick={() => handleExecuteIndividualToolCall(chunk)}
+                                 disabled={executeToolMutation.isPending}
+                                 size="sm"
+                                 className="bg-green-600 hover:bg-green-700 text-white"
+                               >
+                                 {executeToolMutation.isPending ? (
+                                   <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                 ) : (
+                                   <Play className="w-3 h-3 mr-1" />
+                                 )}
+                                 Execute
+                               </Button>
+                             </div>
+                           ) : chunk.kind === ChunkKind.TOOL_RESULT ||
                             (chunk.kind === ChunkKind.CONTENT &&
                               chunk.metadata?.subtype === "code") ? (
                             // Editable for TOOL_RESULT and code CONTENT
