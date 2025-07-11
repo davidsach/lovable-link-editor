@@ -12,6 +12,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Save, Loader2 } from "lucide-react";
 import { Content, ChunkKind } from "../../types/toolTrainer";
+import { examplesApi } from "../../api";
+import { useToast } from "../../hooks/use-toast";
 
 interface SaveToDatabaseProps {
   messages: Content[];
@@ -99,6 +101,8 @@ export const SaveToDatabase: React.FC<SaveToDatabaseProps> = ({
   //     setIsSaving(false);
   //   }
   // };
+  const { toast } = useToast();
+  
   const handleSave = async () => {
     setIsSaving(true);
 
@@ -126,41 +130,30 @@ export const SaveToDatabase: React.FC<SaveToDatabaseProps> = ({
 
       console.log("Payload being sent:", JSON.stringify(payload, null, 2));
 
-      let response;
       if (saveMode === "database") {
-        // Save to Database
-        response = await fetch("http://127.0.0.1:8000/examples/", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: "Bearer abcd",
-          },
-          body: JSON.stringify(payload),
+        // Save to Database using API
+        await examplesApi.createExample(payload);
+        toast({
+          title: "Success",
+          description: "Example saved to database successfully",
         });
       } else {
-        // Save to Markdown File
+        // Save to Markdown File using API
         if (!filePath.trim()) {
-          alert("Please provide a file path for the markdown file.");
+          toast({
+            title: "Error",
+            description: "Please provide a file path for the markdown file.",
+            variant: "destructive",
+          });
           setIsSaving(false);
           return;
         }
-        response = await fetch("http://127.0.0.1:8000/examples/save-markdown", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: "Bearer abcd",
-          },
-          body: JSON.stringify({ path: filePath, example: payload }),
+        await examplesApi.saveToMarkdown(filePath, payload);
+        toast({
+          title: "Success",
+          description: "Example saved to markdown file successfully",
         });
       }
-
-      if (!response.ok) {
-        const errorData = await response.text();
-        throw new Error(`Failed to save: ${response.status} - ${errorData}`);
-      }
-
-      const savedExample = await response.json();
-      console.log("Example saved successfully:", savedExample);
 
       setIsOpen(false);
       setName("");
@@ -169,7 +162,11 @@ export const SaveToDatabase: React.FC<SaveToDatabaseProps> = ({
       setFilePath("");
     } catch (error) {
       console.error("Error saving example:", error);
-      // TODO: Add proper error handling/toast
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to save example",
+        variant: "destructive",
+      });
     } finally {
       setIsSaving(false);
     }

@@ -263,6 +263,78 @@ export const useUpdateExample = () => {
   });
 };
 
+/**
+ * Hook to save example to markdown file
+ * @returns Mutation for markdown save
+ */
+export const useSaveToMarkdown = () => {
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: ({ filePath, example }: { filePath: string; example: CreateExampleRequest }) => {
+      console.log('📝 Saving example to markdown:', filePath);
+      return examplesApi.saveToMarkdown(filePath, example);
+    },
+    onSuccess: (data, variables) => {
+      console.log('✅ Example saved to markdown successfully:', variables.filePath);
+      
+      toast({
+        title: 'Markdown Saved',
+        description: `Example saved to ${variables.filePath} successfully`,
+      });
+    },
+    onError: (error, variables) => {
+      console.error('❌ Failed to save example to markdown:', error);
+      
+      const errorMessage = error instanceof Error && error.message.includes('Failed to connect')
+        ? 'Unable to connect to backend server. Please ensure your backend is running.'
+        : 'Failed to save example to markdown file';
+      
+      toast({
+        title: 'Markdown Save Failed',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+    },
+  });
+};
+
+/**
+ * Hook to load example from markdown file
+ * @returns Mutation for markdown load
+ */
+export const useLoadFromMarkdown = () => {
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (filePath: string) => {
+      console.log('📖 Loading example from markdown:', filePath);
+      return examplesApi.loadFromMarkdown(filePath);
+    },
+    onSuccess: (data, filePath) => {
+      console.log('✅ Example loaded from markdown successfully:', filePath);
+      
+      toast({
+        title: 'Markdown Loaded',
+        description: `Example loaded from ${filePath} successfully`,
+      });
+    },
+    onError: (error, filePath) => {
+      console.error('❌ Failed to load example from markdown:', error);
+      
+      const errorMessage = error instanceof Error && error.message.includes('Failed to connect')
+        ? 'Unable to connect to backend server. Please ensure your backend is running.'
+        : 'Failed to load example from markdown file';
+      
+      toast({
+        title: 'Markdown Load Failed',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+    },
+  });
+};
+
 // =============================================================================
 // UTILITY HOOKS
 // =============================================================================

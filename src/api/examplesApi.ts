@@ -115,6 +115,49 @@ export const examplesApi = {
     return result;
   },
 
+  /**
+   * Save example to markdown file
+   * @param filePath - Path where to save the markdown file
+   * @param example - Example data to save
+   * @returns Promise<ApiResponse<any>> - Save result
+   */
+  async saveToMarkdown(filePath: string, example: CreateExampleRequest): Promise<ApiResponse<any>> {
+    console.log('📝 Saving example to markdown:', filePath);
+    
+    if (!filePath || filePath.trim() === '') {
+      throw new Error('File path is required');
+    }
+    
+    if (!example.name || example.name.trim() === '') {
+      throw new Error('Example name is required');
+    }
+    
+    const result = await apiClient.post<ApiResponse<any>>(
+      ENDPOINTS.EXAMPLES.SAVE_MARKDOWN,
+      { path: filePath, example }
+    );
+    
+    console.log(`✅ Example saved to markdown successfully: ${filePath}`);
+    return result;
+  },
+
+  /**
+   * Load example from markdown file
+   * @param filePath - Path to the markdown file to load
+   * @returns Promise<Example> - Loaded example data
+   */
+  async loadFromMarkdown(filePath: string): Promise<Example> {
+    console.log('📖 Loading example from markdown:', filePath);
+    
+    if (!filePath || filePath.trim() === '') {
+      throw new Error('File path is required');
+    }
+    
+    const result = await apiClient.get<Example>(`${ENDPOINTS.EXAMPLES.LOAD_MARKDOWN}?path=${encodeURIComponent(filePath)}`);
+    console.log(`✅ Example loaded from markdown successfully: ${filePath}`);
+    return result;
+  },
+
   // ---------------------------------------------------------------------------
   // UTILITY FUNCTIONS
   // ---------------------------------------------------------------------------

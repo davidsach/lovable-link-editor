@@ -8,6 +8,9 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Trash2, Download, Calendar, MessageSquare } from 'lucide-react';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { Example } from '../../types/toolTrainer';
+import { useExamples } from '../../hooks/useApi';
+import { examplesApi } from '../../api';
+import { useToast } from '../../hooks/use-toast';
 
 
 interface SavedConversationsProps {
@@ -15,48 +18,31 @@ interface SavedConversationsProps {
 }
 
 export const SavedConversations: React.FC<SavedConversationsProps> = ({ onLoadConversation }) => {
-  const [savedConversations, setSavedConversations] = useState<Example[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Example | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState<{ open: boolean; id: number | null }>({
     open: false,
     id: null
   });
-
-  useEffect(() => {
-    loadConversations();
-  }, []);
-
-  const loadConversations = async () => {
-    try {
-      const response = await fetch('http://127.0.0.1:8000/examples/', {
-        headers: {
-          'Authorization': 'Bearer abcd',
-        },
-      });
-      
-      if (!response.ok) throw new Error('Failed to fetch examples');
-      const data = await response.json();
-      setSavedConversations(data);
-    } catch (err) {
-      console.error('Error loading conversations:', err);
-      setSavedConversations([]);
-    }
-  };
+  
+  const { toast } = useToast();
+  const { data: savedConversations = [], refetch: refetchExamples } = useExamples();
 
   const handleDelete = async (id: number) => {
     try {
-      const response = await fetch(`http://127.0.0.1:8000/examples/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': 'Bearer abcd',
-        },
+      await examplesApi.deleteExample(id.toString());
+      toast({
+        title: 'Success',
+        description: 'Example deleted successfully',
       });
-      if (!response.ok) throw new Error('Failed to delete example');
-      loadConversations();
+      refetchExamples(); // Refresh the list
+      setDeleteConfirmation({ open: false, id: null });
     } catch (err) {
       console.error('Error deleting conversation:', err);
-    } finally {
-      setDeleteConfirmation({ open: false, id: null });
+      toast({
+        title: 'Error',
+        description: 'Failed to delete example',
+        variant: 'destructive',
+      });
     }
   };
   

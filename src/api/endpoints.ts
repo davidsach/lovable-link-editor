@@ -80,6 +80,16 @@ export const ENDPOINTS = {
      * @param id - ID of the example to delete
      */
     DELETE: (id: string | number) => `/examples/${id}`,
+
+    /**
+     * POST /examples/save-markdown - Save example to markdown file
+     */
+    SAVE_MARKDOWN: "/examples/save-markdown",
+
+    /**
+     * GET /examples/load-markdown - Load example from markdown file
+     */
+    LOAD_MARKDOWN: "/examples/load-markdown",
   },
 } as const;
 
