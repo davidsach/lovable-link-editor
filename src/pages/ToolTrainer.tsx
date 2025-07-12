@@ -930,18 +930,58 @@ const ToolTrainer = () => {
 
   const goBackStep = () => {
     setConversation((prev) => {
-      // Remove only the most recent chunk (last message)
       const newMessages = prev.messages.slice(0, -1);
+      
+      // If we removed the last message and now have no messages, reset turn to user
+      if (newMessages.length === 0) {
+        setCurrentStep("user");
+        setConversationStarted(false);
+        setHasAddedTextChunk(false);
+      } else {
+        // Check if the remaining conversation has any assistant messages
+        const allChunks = newMessages.flatMap(m => m.chunks);
+        const hasAssistantChunks = allChunks.some(chunk => 
+          chunk.role === Role.ASSISTANT || 
+          chunk.kind === ChunkKind.TOOL_CALL || 
+          chunk.kind === ChunkKind.TOOL_RESULT
+        );
+        
+        // If no assistant chunks remain, switch to user turn
+        if (!hasAssistantChunks) {
+          setCurrentStep("user");
+          setHasAddedTextChunk(true); // User has added their message
+        } else {
+          // Check if last message is from user or assistant
+          const lastMessage = newMessages[newMessages.length - 1];
+          const lastChunk = lastMessage.chunks[lastMessage.chunks.length - 1];
+          if (lastChunk.role === Role.USER) {
+            setCurrentStep("assistant");
+            setHasAddedTextChunk(false);
+          } else {
+            setCurrentStep("user");
+            setHasAddedTextChunk(true);
+          }
+        }
+      }
+      
       return {
         ...prev,
         messages: newMessages,
       };
     });
 
-    // Optionally update other UI states as needed
+    // Reset UI states
     setShowTextChunkInput(false);
     setMessageContent("");
-    setHasAddedTextChunk(false);
+    
+    // Remove corresponding tool calls if any were removed
+    const allChunks = conversation.messages.flatMap(m => m.chunks);
+    const remainingToolIds = allChunks
+      .filter(chunk => chunk.kind === ChunkKind.TOOL_CALL)
+      .map(chunk => chunk.metadata?.tool_id)
+      .filter(Boolean);
+    
+    setToolCalls(prev => prev.filter(tc => remainingToolIds.includes(tc.id)));
   };
 
   // =============================================================================
@@ -1055,9 +1095,18 @@ const ToolTrainer = () => {
   // Handler for executing individual tool call from conversation
   const handleExecuteIndividualToolCall = async (toolCallChunk: Chunk) => {
     try {
-      const toolData = JSON.parse(toolCallChunk.text);
+      // Parse the tool call to extract python code
+      let pythonCode;
+      try {
+        const toolData = JSON.parse(toolCallChunk.text);
+        pythonCode = toolData.python_code;
+      } catch {
+        // If it's not JSON, treat the chunk text as python code directly
+        pythonCode = toolCallChunk.text;
+      }
+
       const result = await executeToolMutation.mutateAsync({
-        code: toolData.python_code,
+        code: pythonCode,
       });
 
       const formattedResult =
@@ -1527,8 +1576,8 @@ const ToolTrainer = () => {
                         "bg-gradient-to-r from-green-700 to-green-600 text-white border border-green-500/30";
                     } else if (chunk.kind === ChunkKind.TOOL_RESULT) {
                       align = "justify-start";
-                      bubbleStyle =
-                        "bg-gradient-to-r from-orange-700 to-orange-600 text-white border border-orange-500/30";
+                     bubbleStyle =
+                         "bg-gradient-to-r from-green-700 to-green-600 text-white border border-green-500/30";
                     }
                     // For code: use CONTENT kind + metadata.subtype === 'code'
                     else if (
@@ -1542,12 +1591,12 @@ const ToolTrainer = () => {
 
                     return (
                          <div
-                         key={`${msgIdx}-${chunkIdx}`}
-                         className={`flex ${align}`}
-                       >
-                         <div
-                           className={`w-full rounded-2xl p-4 shadow-lg ${bubbleStyle}`}
-                         >
+                          key={`${msgIdx}-${chunkIdx}`}
+                          className={`flex ${align}`}
+                        >
+                          <div
+                            className={`w-full rounded-2xl p-4 shadow-lg ${bubbleStyle}`}
+                          >
                           <div className="flex items-center gap-2 mb-3">
                             <div className="w-6 h-6 rounded-full flex items-center justify-center bg-black/20">
                               {chunk.role === Role.USER && (
@@ -1586,59 +1635,83 @@ const ToolTrainer = () => {
                               </span>
                             )}
                           </div>
-                           {/* Message content */}
-                           {chunk.kind === ChunkKind.TOOL_CALL ? (
-                             <div className="space-y-3">
-                               {/* Editable TOOL_CALL (edit raw JSON or string) */}
-                               <textarea
-                                 className="text-xs text-green-300 bg-gray-900/60 p-2 rounded border border-gray-700/50 font-mono overflow-x-auto w-full"
-                                 value={chunk.text}
-                                 onChange={(e) =>
-                                   handleEditChunkText(
-                                     msgIdx,
-                                     chunkIdx,
-                                     e.target.value
-                                   )
-                                 }
-                                 rows={6}
-                               />
-                               {/* Execute individual tool call button */}
-                               <Button
-                                 onClick={() => handleExecuteIndividualToolCall(chunk)}
-                                 disabled={executeToolMutation.isPending}
-                                 size="sm"
-                                 className="bg-green-600 hover:bg-green-700 text-white"
-                               >
-                                 {executeToolMutation.isPending ? (
-                                   <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                 ) : (
-                                   <Play className="w-3 h-3 mr-1" />
-                                 )}
-                                 Execute
-                               </Button>
-                             </div>
-                           ) : chunk.kind === ChunkKind.TOOL_RESULT ||
-                            (chunk.kind === ChunkKind.CONTENT &&
-                              chunk.metadata?.subtype === "code") ? (
-                            // Editable for TOOL_RESULT and code CONTENT
-                            <textarea
-                              className={
-                                chunk.kind === ChunkKind.TOOL_RESULT
-                                  ? "text-xs text-gray-300 bg-gray-900/60 p-2 rounded border border-gray-700/50 font-mono overflow-x-auto w-full"
-                                  : "bg-gray-900 text-green-400 p-3 rounded text-sm w-full font-mono"
-                              }
-                              value={chunk.text}
-                              onChange={(e) =>
-                                handleEditChunkText(
-                                  msgIdx,
-                                  chunkIdx,
-                                  e.target.value
-                                )
-                              }
-                              rows={
-                                chunk.kind === ChunkKind.TOOL_RESULT ? 4 : 6
-                              }
-                            />
+                            {/* Message content */}
+                            {chunk.kind === ChunkKind.TOOL_CALL ? (
+                              <div className="space-y-3">
+                                {/* Editable TOOL_CALL - show Python code for editing */}
+                                <textarea
+                                  className="text-xs text-green-300 bg-gray-900/60 p-2 rounded border border-gray-700/50 font-mono overflow-x-auto w-full"
+                                  value={(() => {
+                                    try {
+                                      const toolData = JSON.parse(chunk.text);
+                                      return toolData.python_code || chunk.text;
+                                    } catch {
+                                      return chunk.text;
+                                    }
+                                  })()}
+                                  onChange={(e) => {
+                                    // Update the chunk with new Python code, but maintain JSON structure
+                                    try {
+                                      const toolData = JSON.parse(chunk.text);
+                                      toolData.python_code = e.target.value;
+                                      handleEditChunkText(
+                                        msgIdx,
+                                        chunkIdx,
+                                        JSON.stringify(toolData)
+                                      );
+                                    } catch {
+                                      // If not JSON, just update as plain text
+                                      handleEditChunkText(
+                                        msgIdx,
+                                        chunkIdx,
+                                        e.target.value
+                                      );
+                                    }
+                                  }}
+                                  rows={6}
+                                  placeholder="# Write your Python code here
+import requests
+import json
+
+# Your code here..."
+                                />
+                                {/* Execute individual tool call button */}
+                                <Button
+                                  onClick={() => handleExecuteIndividualToolCall(chunk)}
+                                  disabled={executeToolMutation.isPending}
+                                  size="sm"
+                                  className="bg-green-600 hover:bg-green-700 text-white"
+                                >
+                                  {executeToolMutation.isPending ? (
+                                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                  ) : (
+                                    <Play className="w-3 h-3 mr-1" />
+                                  )}
+                                  Execute
+                                </Button>
+                              </div>
+                            ) : chunk.kind === ChunkKind.TOOL_RESULT ||
+                             (chunk.kind === ChunkKind.CONTENT &&
+                               chunk.metadata?.subtype === "code") ? (
+                             // Editable for TOOL_RESULT and code CONTENT
+                             <textarea
+                               className={
+                                 chunk.kind === ChunkKind.TOOL_RESULT
+                                   ? "text-xs text-green-300 bg-gray-900/60 p-2 rounded border border-gray-700/50 font-mono overflow-x-auto w-full"
+                                   : "bg-gray-900 text-green-400 p-3 rounded text-sm w-full font-mono"
+                               }
+                               value={chunk.text}
+                               onChange={(e) =>
+                                 handleEditChunkText(
+                                   msgIdx,
+                                   chunkIdx,
+                                   e.target.value
+                                 )
+                               }
+                               rows={
+                                 chunk.kind === ChunkKind.TOOL_RESULT ? 4 : 6
+                               }
+                             />
                           ) : chunk.kind === ChunkKind.CONTENT ? (
                             // Editable for normal CONTENT (user/assistant text)
                             <textarea

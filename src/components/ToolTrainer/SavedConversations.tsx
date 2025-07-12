@@ -67,7 +67,7 @@ export const SavedConversations: React.FC<SavedConversationsProps> = ({ onLoadCo
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button variant="outline" className="flex items-center gap-2">
+        <Button variant="outline" className="flex items-center gap-2 bg-gray-700 border-gray-600 text-white hover:bg-gray-600 hover:border-blue-400">
           <MessageSquare className="w-4 h-4" />
           Saved Conversations ({savedConversations.length})
         </Button>
