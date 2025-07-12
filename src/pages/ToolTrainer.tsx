@@ -1381,7 +1381,7 @@ const ToolTrainer = () => {
             <CardContent className="space-y-3 pt-0">
               <div className="grid md:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-300">
+                  <label className="text-sm font-medium text-foreground">
                     Example Name
                   </label>
                   <Input
@@ -1393,11 +1393,11 @@ const ToolTrainer = () => {
                       }))
                     }
                     placeholder="Enter example name..."
-                    className="bg-gray-600/80 border-gray-500/50 text-white placeholder:text-gray-400 focus:border-blue-400/50 transition-colors h-8"
+                    className="bg-background border-input text-foreground placeholder:text-muted-foreground focus:border-ring transition-colors h-8"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-300">
+                  <label className="text-sm font-medium text-foreground">
                     Tags
                   </label>
                   <div className="flex flex-wrap gap-1 items-center">
@@ -1426,7 +1426,7 @@ const ToolTrainer = () => {
                 </div>
               </div>
               <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-300">
+                <label className="text-sm font-medium text-foreground">
                   Description
                 </label>
                 <Textarea
@@ -1438,10 +1438,10 @@ const ToolTrainer = () => {
                     }))
                   }
                   placeholder="Describe what this training example demonstrates..."
-                  className="min-h-[50px] bg-gray-600/80 border-gray-500/50 text-white placeholder:text-gray-400 focus:border-blue-400/50 transition-colors"
+                  className="min-h-[50px] bg-background border-input text-foreground placeholder:text-muted-foreground focus:border-ring transition-colors"
                 />
               </div>
-              <div className="flex items-center gap-4 text-xs text-gray-400">
+              <div className="flex items-center gap-4 text-xs text-muted-foreground">
                 <div className="flex items-center bg-gray-700/50 px-2 py-1 rounded-full">
                   <Calendar className="w-3 h-3 mr-1" />
                   Created: {conversation.createdAt.toLocaleDateString()}
@@ -1452,7 +1452,7 @@ const ToolTrainer = () => {
                 </div>
                 <Badge
                   variant="outline"
-                  className="border-gray-500/50 text-gray-300 bg-gray-700/30 text-xs px-2 py-0"
+                  className="border-input text-foreground bg-muted text-xs px-2 py-0"
                 >
                   <MessageSquare className="w-3 h-3 mr-1" />
                   {conversation.messages.length} message
@@ -1508,15 +1508,15 @@ const ToolTrainer = () => {
           {/* Conversation Messages with Execute Button */}
           <ScrollArea className="flex-1 p-6">
             {!conversation.messages || conversation.messages.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-gray-400">
+              <div className="flex items-center justify-center h-full text-muted-foreground">
                 <div className="text-center">
                   <div className="w-24 h-24 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <MessageSquare className="w-12 h-12 text-gray-500" />
+                    <MessageSquare className="w-12 h-12 text-muted-foreground" />
                   </div>
-                  <p className="text-xl mb-3 text-gray-300">
+                  <p className="text-xl mb-3 text-foreground">
                     Ready to start training
                   </p>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-muted-foreground">
                     Click "New Turn" to begin the conversation
                   </p>
                   <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
@@ -1560,7 +1560,7 @@ const ToolTrainer = () => {
                     // Determine alignment and style
                     let align = "justify-start";
                     let bubbleStyle =
-                      "bg-gradient-to-r from-gray-700 to-gray-600 text-white border border-gray-500/30";
+                      "bg-muted text-foreground border border-border";
                     if (chunk.role === Role.USER) {
                       align = "justify-end";
                       bubbleStyle =
@@ -1568,7 +1568,7 @@ const ToolTrainer = () => {
                     } else if (chunk.role === Role.ASSISTANT) {
                       align = "justify-start";
                       bubbleStyle =
-                        "bg-gradient-to-r from-gray-700 to-gray-600 text-white border border-gray-500/30";
+                        "bg-muted text-foreground border border-border";
                     }
                     if (chunk.kind === ChunkKind.TOOL_CALL) {
                       align = "justify-start";
@@ -1586,7 +1586,7 @@ const ToolTrainer = () => {
                     ) {
                       align = "justify-start";
                       bubbleStyle =
-                        "bg-gradient-to-r from-gray-900 to-gray-800 text-green-400 border border-gray-700/30";
+                        "bg-green-50 dark:bg-green-950 text-green-800 dark:text-green-200 border border-green-200 dark:border-green-800";
                     }
 
                     return (
@@ -1715,7 +1715,7 @@ import json
                           ) : chunk.kind === ChunkKind.CONTENT ? (
                             // Editable for normal CONTENT (user/assistant text)
                             <textarea
-                              className="whitespace-pre-wrap leading-relaxed bg-gray-700/50 rounded p-2 w-full text-white"
+                              className="whitespace-pre-wrap leading-relaxed bg-muted rounded p-2 w-full text-foreground"
                               value={chunk.text}
                               onChange={(e) =>
                                 handleEditChunkText(
@@ -1735,7 +1735,7 @@ import json
                           {/* Metadata */}
                           {chunk.metadata &&
                             Object.keys(chunk.metadata).length > 0 && (
-                              <div className="mt-2 text-xs text-gray-500">
+                              <div className="mt-2 text-xs text-muted-foreground">
                                 <strong>Metadata:</strong>{" "}
                                 {JSON.stringify(chunk.metadata, null, 2)}
                               </div>
@@ -1811,7 +1811,7 @@ import json
                       <div className="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center">
                         <Settings className="w-4 h-4 text-green-400" />
                       </div>
-                      <label className="text-sm font-medium text-white">
+                      <label className="text-sm font-medium text-foreground">
                         Tool Call {index + 1}
                       </label>
                       <Badge
@@ -1857,7 +1857,7 @@ import json
 
                     <div className="grid grid-cols-2 gap-4 mb-4">
                       <div className="space-y-2">
-                        <label className="text-sm text-gray-300 font-medium">
+                        <label className="text-sm text-foreground font-medium">
                           Tool Name
                         </label>
                         <Select
@@ -1883,7 +1883,7 @@ import json
                       </div>
 
                       <div className="space-y-2">
-                        <label className="text-sm text-gray-300 font-medium">
+                        <label className="text-sm text-foreground font-medium">
                           Parameters (JSON)
                         </label>
                         <Input
@@ -1901,7 +1901,7 @@ import json
                     </div>
 
                     <div className="space-y-2 mb-4">
-                      <label className="text-sm text-gray-300 font-medium flex items-center">
+                      <label className="text-sm text-foreground font-medium flex items-center">
                         <Code className="w-4 h-4 mr-1 text-blue-400" />
                         Python Code *
                       </label>
@@ -1916,7 +1916,7 @@ import json
                     </div>
 
                     <div className="space-y-2 mb-4">
-                      <label className="text-sm text-gray-300 font-medium flex items-center">
+                      <label className="text-sm text-foreground font-medium flex items-center">
                         <CheckCircle className="w-4 h-4 mr-1 text-green-400" />
                         Tool Result
                       </label>

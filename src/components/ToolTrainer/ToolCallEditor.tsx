@@ -49,7 +49,7 @@ export const ToolCallEditor: React.FC<ToolCallEditorProps> = ({
     if (value.trim()) {
       return { icon: CheckCircle, color: 'text-green-600', label: 'Valid' };
     }
-    return { icon: Info, color: 'text-gray-500', label: 'Empty' };
+    return { icon: Info, color: 'text-muted-foreground', label: 'Empty' };
   };
 
   const status = getValidationStatus();
@@ -63,7 +63,7 @@ export const ToolCallEditor: React.FC<ToolCallEditorProps> = ({
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700">Python Code:</label>
+            <label className="text-sm font-medium text-foreground">Python Code:</label>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -72,7 +72,7 @@ export const ToolCallEditor: React.FC<ToolCallEditorProps> = ({
                   className="h-5 w-5 p-0"
                   onClick={() => setShowHelp(!showHelp)}
                 >
-                  <HelpCircle className="w-4 h-4 text-gray-400" />
+                  <HelpCircle className="w-4 h-4 text-muted-foreground" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
@@ -120,12 +120,12 @@ try:
     print("Success:", data)
 except Exception as e:
     print("Error:", str(e))`}
-            className={`font-mono text-sm min-h-[200px] bg-gray-50 border-gray-300 resize-y ${
+            className={`font-mono text-sm min-h-[200px] bg-muted border-input resize-y text-foreground ${
               hasErrors
-                ? 'border-red-300 focus:border-red-500' 
+                ? 'border-destructive focus:border-destructive' 
                 : validation.warnings.length > 0 
-                ? 'border-yellow-300 focus:border-yellow-500'
-                : 'border-gray-300'
+                ? 'border-yellow-500 focus:border-yellow-600'
+                : 'border-input'
             } ${className || ''}`}
             spellCheck={false}
             aria-label="Python code editor"
@@ -165,7 +165,7 @@ except Exception as e:
           </Alert>
         )}
 
-        <div className="text-xs text-gray-500" id="python-code-help">
+        <div className="text-xs text-muted-foreground" id="python-code-help">
           Write Python code that will be executed safely. Results will be captured and displayed below.
           {value.length > 0 && (
             <span className="ml-2">
