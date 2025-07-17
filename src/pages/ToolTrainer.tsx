@@ -543,6 +543,19 @@ const ToolTrainer = () => {
     setCurrentStep(currentStep === "user" ? "assistant" : "user");
   };
 
+  // Helper function to get or create assistant message
+  const getOrCreateAssistantMessage = () => {
+    const lastMessage = conversation.messages[conversation.messages.length - 1];
+    
+    // If last message exists and has assistant chunks, return its index
+    if (lastMessage && lastMessage.chunks.some(chunk => chunk.role === Role.ASSISTANT)) {
+      return conversation.messages.length - 1;
+    }
+    
+    // Otherwise return -1 to indicate we need a new message
+    return -1;
+  };
+
   const addTextChunk = () => {
     if (messageContent.trim()) {
       // Create a chunk with the new structure
@@ -554,16 +567,40 @@ const ToolTrainer = () => {
         timestamp: new Date().toISOString(),
       };
 
-      // Create a Content message containing the chunk
-      const newMessage: Content = {
-        chunks: [newChunk],
-      };
-
-      setConversation((prev) => ({
-        ...prev,
-        messages: [...prev.messages, newMessage],
-        updatedAt: new Date(),
-      }));
+      setConversation((prev) => {
+        if (currentStep === "user") {
+          // User chunks always create new messages
+          return {
+            ...prev,
+            messages: [...prev.messages, { chunks: [newChunk] }],
+            updatedAt: new Date(),
+          };
+        } else {
+          // Assistant chunks: add to existing assistant message if possible
+          const assistantMessageIndex = getOrCreateAssistantMessage();
+          
+          if (assistantMessageIndex >= 0) {
+            // Add to existing assistant message
+            const newMessages = [...prev.messages];
+            newMessages[assistantMessageIndex] = {
+              ...newMessages[assistantMessageIndex],
+              chunks: [...newMessages[assistantMessageIndex].chunks, newChunk]
+            };
+            return {
+              ...prev,
+              messages: newMessages,
+              updatedAt: new Date(),
+            };
+          } else {
+            // Create new assistant message
+            return {
+              ...prev,
+              messages: [...prev.messages, { chunks: [newChunk] }],
+              updatedAt: new Date(),
+            };
+          }
+        }
+      });
 
       if (!conversationStarted) {
         setConversationStarted(true);
@@ -658,16 +695,31 @@ const ToolTrainer = () => {
         timestamp: new Date().toISOString(),
       };
 
-      // ✅ UPDATED: Add both chunks as separate Content messages
-      setConversation((prev) => ({
-        ...prev,
-        messages: [
-          ...prev.messages,
-          { chunks: [toolCallChunk] },
-          { chunks: [toolResultChunk] },
-        ],
-        updatedAt: new Date(),
-      }));
+      // ✅ UPDATED: Add both chunks to assistant message
+      setConversation((prev) => {
+        const assistantMessageIndex = getOrCreateAssistantMessage();
+        
+        if (assistantMessageIndex >= 0) {
+          // Add to existing assistant message
+          const newMessages = [...prev.messages];
+          newMessages[assistantMessageIndex] = {
+            ...newMessages[assistantMessageIndex],
+            chunks: [...newMessages[assistantMessageIndex].chunks, toolCallChunk, toolResultChunk]
+          };
+          return {
+            ...prev,
+            messages: newMessages,
+            updatedAt: new Date(),
+          };
+        } else {
+          // Create new assistant message with both chunks
+          return {
+            ...prev,
+            messages: [...prev.messages, { chunks: [toolCallChunk, toolResultChunk] }],
+            updatedAt: new Date(),
+          };
+        }
+      });
 
       // Hide tool editor after successful execution
       setShowToolEditor(false);
@@ -707,16 +759,31 @@ const ToolTrainer = () => {
         timestamp: new Date().toISOString(),
       };
 
-      // ✅ UPDATED: Add error chunks as separate Content messages
-      setConversation((prev) => ({
-        ...prev,
-        messages: [
-          ...prev.messages,
-          { chunks: [toolCallChunk] },
-          { chunks: [toolResultChunk] },
-        ],
-        updatedAt: new Date(),
-      }));
+      // ✅ UPDATED: Add error chunks to assistant message
+      setConversation((prev) => {
+        const assistantMessageIndex = getOrCreateAssistantMessage();
+        
+        if (assistantMessageIndex >= 0) {
+          // Add to existing assistant message
+          const newMessages = [...prev.messages];
+          newMessages[assistantMessageIndex] = {
+            ...newMessages[assistantMessageIndex],
+            chunks: [...newMessages[assistantMessageIndex].chunks, toolCallChunk, toolResultChunk]
+          };
+          return {
+            ...prev,
+            messages: newMessages,
+            updatedAt: new Date(),
+          };
+        } else {
+          // Create new assistant message with both chunks
+          return {
+            ...prev,
+            messages: [...prev.messages, { chunks: [toolCallChunk, toolResultChunk] }],
+            updatedAt: new Date(),
+          };
+        }
+      });
 
       // Hide tool editor after failed execution
       setShowToolEditor(false);
@@ -826,16 +893,32 @@ const ToolTrainer = () => {
         }
       });
 
-      // Add all new chunks at once
+      // Add all new chunks at once to assistant message
       if (newChunks.length > 0) {
-        setConversation((prev) => ({
-          ...prev,
-          messages: [
-            ...prev.messages,
-            ...newChunks.map(chunk => ({ chunks: [chunk] })),
-          ],
-          updatedAt: new Date(),
-        }));
+        setConversation((prev) => {
+          const assistantMessageIndex = getOrCreateAssistantMessage();
+          
+          if (assistantMessageIndex >= 0) {
+            // Add to existing assistant message
+            const newMessages = [...prev.messages];
+            newMessages[assistantMessageIndex] = {
+              ...newMessages[assistantMessageIndex],
+              chunks: [...newMessages[assistantMessageIndex].chunks, ...newChunks]
+            };
+            return {
+              ...prev,
+              messages: newMessages,
+              updatedAt: new Date(),
+            };
+          } else {
+            // Create new assistant message with all chunks
+            return {
+              ...prev,
+              messages: [...prev.messages, { chunks: newChunks }],
+              updatedAt: new Date(),
+            };
+          }
+        });
       }
 
       // Hide tool editor and show results in conversation area after execution
@@ -888,15 +971,30 @@ const ToolTrainer = () => {
             timestamp: new Date().toISOString(),
           };
 
-          setConversation((prev) => ({
-            ...prev,
-            messages: [
-              ...prev.messages,
-              { chunks: [toolCallChunk] },
-              { chunks: [toolResultChunk] },
-            ],
-            updatedAt: new Date(),
-          }));
+          setConversation((prev) => {
+            const assistantMessageIndex = getOrCreateAssistantMessage();
+            
+            if (assistantMessageIndex >= 0) {
+              // Add to existing assistant message
+              const newMessages = [...prev.messages];
+              newMessages[assistantMessageIndex] = {
+                ...newMessages[assistantMessageIndex],
+                chunks: [...newMessages[assistantMessageIndex].chunks, toolCallChunk, toolResultChunk]
+              };
+              return {
+                ...prev,
+                messages: newMessages,
+                updatedAt: new Date(),
+              };
+            } else {
+              // Create new assistant message with both chunks
+              return {
+                ...prev,
+                messages: [...prev.messages, { chunks: [toolCallChunk, toolResultChunk] }],
+                updatedAt: new Date(),
+              };
+            }
+          });
         }
       });
     }
