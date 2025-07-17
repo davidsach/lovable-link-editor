@@ -21,7 +21,7 @@ export enum Role {
 
 export enum ChunkKind {
   UNKNOWN_KIND = 0,
-  CONTENT = 1,
+  TEXT = 1,
   TOOL_CALL = 2,
   TOOL_RESULT = 3,
   FORMATTING = 4,
@@ -35,15 +35,31 @@ export enum ChunkKind {
  * Single chunk of a message (matches backend Chunk model)
  */
 export interface Chunk {
+  file?: any;
   text?: string;
-  // Add other media fields if needed (image, audio, video, file, control, etc.)
+  audio?: any;
+  image?: any;
+  video?: any;
+  channel?: string;
+  control?: any;
   kind: ChunkKind;
   role: Role;
-  metadata?: Record<string, any>;
+  metadata?: ChunkMetadata;
   mimetype?: string;
-  channel?: string;
-  trainable?: number;
+  json_data?: any;
+  trainable?: Trainable;
   timestamp?: string;
+}
+
+export interface ChunkMetadata {
+  tool?: any;
+  safety?: any;
+  finish_reason?: any;
+}
+
+export enum Trainable {
+  EXCLUDE = 0,
+  INCLUDE = 2,
 }
 
 /**
@@ -96,12 +112,9 @@ export interface UpdateExampleRequest extends Partial<CreateExampleRequest> {}
 // =============================================================================
 
 export interface ToolCall {
-  id: string;
-  toolName: string;
+  tool_name: string;
   parameters: Record<string, any>;
-  result: any;
-  status: 'pending' | 'executing' | 'completed' | 'failed';
-  timestamp?: Date;
+  python_code?: string;
 }
 
 export interface Tool {

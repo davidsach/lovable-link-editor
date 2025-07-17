@@ -13,15 +13,15 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 
 // Import components
-import NavigationHeader from '@/components/ToolTrainer/NavigationHeader';
-import SaveToDatabase from '@/components/ToolTrainer/SaveToDatabase';
-import RetrieveExample from '@/components/ToolTrainer/RetrieveExample';
-import EditExample from '@/components/ToolTrainer/EditExample';
-import SavedConversations from '@/components/ToolTrainer/SavedConversations';
-import EmptyState from '@/components/ToolTrainer/EmptyState';
+import { NavigationHeader } from '@/components/ToolTrainer/NavigationHeader';
+import { SaveToDatabase } from '@/components/ToolTrainer/SaveToDatabase';
+import { RetrieveExample } from '@/components/ToolTrainer/RetrieveExample';
+import { EditExample } from '@/components/ToolTrainer/EditExample';
+import { SavedConversations } from '@/components/ToolTrainer/SavedConversations';
+import { EmptyState } from '@/components/ToolTrainer/EmptyState';
 
 // Import types
-import { Content, Chunk, ChunkKind, Role, Trainable, ToolCall, ChunkMetadata } from '@/types/toolTrainer';
+import { Content, Chunk, ChunkKind, Role, Example, ToolCall, ChunkMetadata, Trainable } from '@/types/toolTrainer';
 
 const ToolTrainer = () => {
   const { toast } = useToast();
@@ -29,6 +29,14 @@ const ToolTrainer = () => {
   // State for conversation
   const [conversation, setConversation] = useState<Content[]>([]);
   const [currentTurn, setCurrentTurn] = useState<'user' | 'assistant'>('user');
+  const [currentExample, setCurrentExample] = useState<Example>({
+    id: 1,
+    name: 'New Example',
+    description: '',
+    messages: [],
+    created_at: new Date().toISOString(),
+    meta: { tags: [] }
+  });
   
   // State for current tool call being created
   const [toolName, setToolName] = useState('');
@@ -520,13 +528,22 @@ const ToolTrainer = () => {
   }, []);
 
   // Load example conversation
-  const loadExample = useCallback((example: Content[]) => {
-    setConversation(example);
+  const loadExample = useCallback((example: Example) => {
+    setConversation(example.messages || []);
+    setCurrentExample(example);
     toast({
       title: "Success",
       description: "Example loaded successfully"
     });
   }, [toast]);
+
+  // Update current example when conversation changes
+  React.useEffect(() => {
+    setCurrentExample(prev => ({
+      ...prev,
+      messages: conversation
+    }));
+  }, [conversation]);
 
   // Get role color for display
   const getRoleColor = (role: Role) => {
@@ -583,9 +600,10 @@ const ToolTrainer = () => {
   return (
     <div className="container mx-auto p-4 space-y-6">
       <NavigationHeader 
-        conversation={conversation}
-        onClearConversation={clearConversation}
-        generateAssistantResponse={generateAssistantResponse}
+        currentExample={currentExample}
+        onNavigatePrevious={() => setCurrentExample(prev => ({ ...prev, id: Math.max(1, prev.id - 1) }))}
+        onNavigateNext={() => setCurrentExample(prev => ({ ...prev, id: prev.id + 1 }))}
+        onLoadConversation={loadExample}
       />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -599,7 +617,11 @@ const ToolTrainer = () => {
 
         <TabsContent value="conversation" className="space-y-4">
           {conversation.length === 0 ? (
-            <EmptyState />
+            <EmptyState 
+              isLoading={isExecuting}
+              onAddNewTurn={() => setCurrentTurn('user')}
+              onAutoGenerate={() => executeAllToolCalls()}
+            />
           ) : (
             <Card>
               <CardHeader>
@@ -786,21 +808,25 @@ const ToolTrainer = () => {
 
         <TabsContent value="save">
           <SaveToDatabase 
-            conversation={conversation}
-            generateAssistantResponse={generateAssistantResponse}
+            messages={conversation}
+            tags={currentExample.meta?.tags || []}
+            exampleName={currentExample.name}
           />
         </TabsContent>
 
         <TabsContent value="retrieve">
-          <RetrieveExample onLoad={loadExample} />
+          <RetrieveExample onExampleRetrieved={loadExample} />
         </TabsContent>
 
         <TabsContent value="edit">
-          <EditExample onLoad={loadExample} />
+          <EditExample 
+            currentExample={currentExample}
+            onExampleUpdated={loadExample}
+          />
         </TabsContent>
 
         <TabsContent value="saved">
-          <SavedConversations onLoad={loadExample} />
+          <SavedConversations onLoadConversation={loadExample} />
         </TabsContent>
       </Tabs>
 

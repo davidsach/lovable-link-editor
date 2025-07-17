@@ -38,7 +38,7 @@ export enum Role {
  */
 export enum ChunkKind {
   UNKNOWN_KIND = 0,
-  CONTENT = 1,
+  TEXT = 1,
   TOOL_CALL = 2,
   TOOL_RESULT = 3,
   FORMATTING = 4,
