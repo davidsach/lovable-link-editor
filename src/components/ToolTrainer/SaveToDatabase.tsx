@@ -31,7 +31,7 @@ export const SaveToDatabase: React.FC<SaveToDatabaseProps> = ({
   const [name, setName] = useState(exampleName);
   const [description, setDescription] = useState("");
   const [localTags, setLocalTags] = useState(tags);
-  const [saveMode, setSaveMode] = useState<"database" | "markdown">("database");
+  const [saveMode, setSaveMode] = useState<"database" | "json">("database");
   const [filePath, setFilePath] = useState("");
 
   React.useEffect(() => {
@@ -43,66 +43,8 @@ export const SaveToDatabase: React.FC<SaveToDatabaseProps> = ({
     }
   }, [isOpen, exampleName, tags]);
 
-  // const handleSave = async () => {
-  //   setIsSaving(true);
-
-  //   try {
-  //     // Filter out chunks with empty or missing text
-  //     const filteredMessages = messages
-  //       .map(content => ({
-  //         ...content,
-  //         chunks: content.chunks.filter(chunk =>
-  //           chunk.text && chunk.text.trim() !== ''
-  //         )
-  //       }))
-  //       .filter(content => content.chunks.length > 0); // Remove empty messages
-
-  //     const payload = {
-  //       name: name || `Example ${Date.now()}`,
-  //       description: description || '',
-  //       messages: filteredMessages,
-  //       meta: {
-  //         tags: localTags,
-  //         created_by: 'user',
-  //         source: 'tool_trainer'
-  //       }
-  //     };
-
-  //     console.log('Payload being sent:', JSON.stringify(payload, null, 2));
-
-  //     console.log('Saving to database with new structure:', payload);
-
-  //     const response = await fetch('http://127.0.0.1:8000/examples/', {
-  //       method: 'POST',
-  //       headers: {
-  //         'Content-Type': 'application/json',
-  //         'Authorization': 'Bearer abcd',
-  //       },
-  //       body: JSON.stringify(payload),
-  //     });
-
-  //     if (!response.ok) {
-  //       const errorData = await response.text();
-  //       throw new Error(`Failed to save: ${response.status} - ${errorData}`);
-  //     }
-
-  //     const savedExample = await response.json();
-  //     console.log('Example saved successfully with new structure:', savedExample);
-  //     setIsOpen(false);
-
-  //     // Reset form
-  //     setName('');
-  //     setDescription('');
-  //     setLocalTags([]);
-  //   } catch (error) {
-  //     console.error('Error saving example:', error);
-  //     // TODO: Add proper error handling/toast
-  //   } finally {
-  //     setIsSaving(false);
-  //   }
-  // };
   const { toast } = useToast();
-  
+
   const handleSave = async () => {
     setIsSaving(true);
 
@@ -121,11 +63,11 @@ export const SaveToDatabase: React.FC<SaveToDatabaseProps> = ({
         name: name || `Example ${Date.now()}`,
         description: description || "",
         messages: filteredMessages,
-        meta: {
-          tags: localTags,
-          created_by: "user",
-          source: "tool_trainer",
-        },
+        tags: localTags,
+        is_global: true,
+        is_eval: false,
+        readable_by_user_ids: [],
+        readable_by_group_ids: [],
       };
 
       console.log("Payload being sent:", JSON.stringify(payload, null, 2));
@@ -138,20 +80,20 @@ export const SaveToDatabase: React.FC<SaveToDatabaseProps> = ({
           description: "Example saved to database successfully",
         });
       } else {
-        // Save to Markdown File using API
+        // Save to JSON  File using API
         if (!filePath.trim()) {
           toast({
             title: "Error",
-            description: "Please provide a file path for the markdown file.",
+            description: "Please provide a file path for the JSON file.",
             variant: "destructive",
           });
           setIsSaving(false);
           return;
         }
-        await examplesApi.saveToMarkdown(filePath, payload);
+        await examplesApi.saveToJSON(filePath, payload);
         toast({
           title: "Success",
-          description: "Example saved to markdown file successfully",
+          description: "Example saved to JSON file successfully",
         });
       }
 
@@ -164,7 +106,8 @@ export const SaveToDatabase: React.FC<SaveToDatabaseProps> = ({
       console.error("Error saving example:", error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to save example",
+        description:
+          error instanceof Error ? error.message : "Failed to save example",
         variant: "destructive",
       });
     } finally {
@@ -209,24 +152,24 @@ export const SaveToDatabase: React.FC<SaveToDatabaseProps> = ({
               <label className="flex items-center gap-1">
                 <input
                   type="radio"
-                  checked={saveMode === "markdown"}
-                  onChange={() => setSaveMode("markdown")}
+                  checked={saveMode === "json"}
+                  onChange={() => setSaveMode("json")}
                 />
-                <span>Markdown File</span>
+                <span>JSON File</span>
               </label>
             </div>
           </div>
 
-          {saveMode === "markdown" && (
+          {saveMode === "json" && (
             <div className="space-y-2">
               <Label htmlFor="markdown_path" className="text-gray-300">
-                Markdown File Path
+                JSON File Path
               </Label>
               <Input
                 id="markdown_path"
                 value={filePath}
                 onChange={(e) => setFilePath(e.target.value)}
-                placeholder="e.g. /mnt/examples/example1.md"
+                placeholder="e.g. /mnt/examples/example1.json"
                 className="bg-gray-700 border-gray-600 text-white"
               />
             </div>

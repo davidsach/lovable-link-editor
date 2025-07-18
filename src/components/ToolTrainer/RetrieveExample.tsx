@@ -29,41 +29,48 @@ export const RetrieveExample: React.FC<RetrieveExampleProps> = ({
   const [showAllExamples, setShowAllExamples] = useState(false);
 
   // NEW: Mode selector and file path state
-  const [retrieveMode, setRetrieveMode] = useState<"database" | "markdown">(
+  const [retrieveMode, setRetrieveMode] = useState<"database" | "json">(
     "database"
   );
   const [filePath, setFilePath] = useState("");
 
-  // NEW: Retrieve by file path
+  // Retrieve by file path using JSON endpoint
   const handleRetrieveByFilePath = async () => {
     if (!filePath.trim()) return;
     setIsLoading(true);
     try {
       const response = await fetch(
-        "http://127.0.0.1:8000/examples/load-markdown",
+        "http://127.0.0.1:8000/examples/get_from_json/",
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: "Bearer abcd",
           },
-          body: JSON.stringify({ path: filePath }),
+          body: JSON.stringify({ file_path: filePath }),
         }
       );
       if (!response.ok)
         throw new Error(`Failed to retrieve example: ${response.status}`);
+      // This may not include id/created_at/updated_at,
+      // so default missing fields as needed:
       const example = await response.json();
-      setRetrievedExample(example);
-      console.log("Example retrieved from markdown:", example);
+      setRetrievedExample({
+        id: undefined, // or a stub, or leave blank
+        created_at: undefined,
+        updated_at: undefined,
+        ...example,
+      });
+      console.log("Example retrieved from JSON:", example);
     } catch (error) {
-      console.error("Error retrieving markdown example:", error);
+      console.error("Error retrieving JSON example:", error);
       setRetrievedExample(null);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Updated: Retrieve by ID (DB)
+  // Retrieve by ID (DB)
   const handleRetrieveById = async () => {
     if (!exampleId.trim()) return;
     setIsLoading(true);
@@ -87,7 +94,7 @@ export const RetrieveExample: React.FC<RetrieveExampleProps> = ({
     }
   };
 
-  // Retrieve all from DB (unchanged)
+  // Retrieve all from DB
   const handleRetrieveAll = async () => {
     setIsLoading(true);
     try {
@@ -127,7 +134,7 @@ export const RetrieveExample: React.FC<RetrieveExampleProps> = ({
     setFilePath("");
   };
 
-  // NEW: Unified retrieve handler
+  // Unified retrieve handler
   const handleRetrieve = () => {
     if (retrieveMode === "database") {
       handleRetrieveById();
@@ -152,7 +159,7 @@ export const RetrieveExample: React.FC<RetrieveExampleProps> = ({
         <DialogHeader>
           <DialogTitle className="text-blue-300">
             Retrieve Example (
-            {retrieveMode === "database" ? "Database" : "Markdown File"})
+            {retrieveMode === "database" ? "Database" : "JSON File"})
           </DialogTitle>
         </DialogHeader>
 
@@ -172,10 +179,10 @@ export const RetrieveExample: React.FC<RetrieveExampleProps> = ({
               <label className="flex items-center gap-1">
                 <input
                   type="radio"
-                  checked={retrieveMode === "markdown"}
-                  onChange={() => setRetrieveMode("markdown")}
+                  checked={retrieveMode === "json"}
+                  onChange={() => setRetrieveMode("json")}
                 />
-                <span>Markdown File</span>
+                <span>JSON File</span>
               </label>
             </div>
           </div>
@@ -213,14 +220,14 @@ export const RetrieveExample: React.FC<RetrieveExampleProps> = ({
           ) : (
             <div className="space-y-2">
               <Label htmlFor="filePath" className="text-gray-300">
-                Markdown File Path
+                JSON File Path
               </Label>
               <div className="flex gap-2">
                 <Input
                   id="filePath"
                   value={filePath}
                   onChange={(e) => setFilePath(e.target.value)}
-                  placeholder="e.g. /mnt/examples/example1.md"
+                  placeholder="e.g. ./src/alfred/mock/api/training_examples/example1.json"
                   className="bg-gray-700 border-gray-600 text-white"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") handleRetrieve();
@@ -268,7 +275,9 @@ export const RetrieveExample: React.FC<RetrieveExampleProps> = ({
               <div className="space-y-2 text-sm">
                 <div>
                   <span className="text-gray-400">ID:</span>{" "}
-                  {retrievedExample.id}
+                  {retrievedExample.id || (
+                    <span className="italic text-gray-500">(N/A)</span>
+                  )}
                 </div>
                 <div>
                   <span className="text-gray-400">Name:</span>{" "}
@@ -284,9 +293,11 @@ export const RetrieveExample: React.FC<RetrieveExampleProps> = ({
                 </div>
                 <div>
                   <span className="text-gray-400">Created:</span>{" "}
-                  {retrievedExample.created_at
-                    ? new Date(retrievedExample.created_at).toLocaleDateString()
-                    : "Unknown"}
+                  {retrievedExample.created_at ? (
+                    new Date(retrievedExample.created_at).toLocaleDateString()
+                  ) : (
+                    <span className="italic text-gray-500">(N/A)</span>
+                  )}
                 </div>
               </div>
 

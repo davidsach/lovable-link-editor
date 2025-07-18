@@ -82,14 +82,14 @@ export const ENDPOINTS = {
     DELETE: (id: string | number) => `/examples/${id}`,
 
     /**
-     * POST /examples/save-markdown - Save example to markdown file
+     * POST /examples/save-json - Save example to json file
      */
-    SAVE_MARKDOWN: "/examples/save-markdown",
+    SAVE_JSON: "/examples/save_to_json/",
 
     /**
-     * GET /examples/load-markdown - Load example from markdown file
+     * GET /examples/load-json - Load example from json file
      */
-    LOAD_MARKDOWN: "/examples/load-markdown",
+    LOAD_JSON: "/examples/get_from_json/",
   },
 } as const;
 

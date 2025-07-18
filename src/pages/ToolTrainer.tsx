@@ -543,6 +543,22 @@ const ToolTrainer = () => {
     setCurrentStep(currentStep === "user" ? "assistant" : "user");
   };
 
+  // Helper function to get or create assistant message
+  const getOrCreateAssistantMessage = () => {
+    const lastMessage = conversation.messages[conversation.messages.length - 1];
+
+    // If last message exists and has assistant chunks, return its index
+    if (
+      lastMessage &&
+      lastMessage.chunks.some((chunk) => chunk.role === Role.ASSISTANT)
+    ) {
+      return conversation.messages.length - 1;
+    }
+
+    // Otherwise return -1 to indicate we need a new message
+    return -1;
+  };
+
   const addTextChunk = () => {
     if (messageContent.trim()) {
       // Create a chunk with the new structure
@@ -554,16 +570,40 @@ const ToolTrainer = () => {
         timestamp: new Date().toISOString(),
       };
 
-      // Create a Content message containing the chunk
-      const newMessage: Content = {
-        chunks: [newChunk],
-      };
+      setConversation((prev) => {
+        if (currentStep === "user") {
+          // User chunks always create new messages
+          return {
+            ...prev,
+            messages: [...prev.messages, { chunks: [newChunk] }],
+            updatedAt: new Date(),
+          };
+        } else {
+          // Assistant chunks: add to existing assistant message if possible
+          const assistantMessageIndex = getOrCreateAssistantMessage();
 
-      setConversation((prev) => ({
-        ...prev,
-        messages: [...prev.messages, newMessage],
-        updatedAt: new Date(),
-      }));
+          if (assistantMessageIndex >= 0) {
+            // Add to existing assistant message
+            const newMessages = [...prev.messages];
+            newMessages[assistantMessageIndex] = {
+              ...newMessages[assistantMessageIndex],
+              chunks: [...newMessages[assistantMessageIndex].chunks, newChunk],
+            };
+            return {
+              ...prev,
+              messages: newMessages,
+              updatedAt: new Date(),
+            };
+          } else {
+            // Create new assistant message
+            return {
+              ...prev,
+              messages: [...prev.messages, { chunks: [newChunk] }],
+              updatedAt: new Date(),
+            };
+          }
+        }
+      });
 
       if (!conversationStarted) {
         setConversationStarted(true);
@@ -658,16 +698,38 @@ const ToolTrainer = () => {
         timestamp: new Date().toISOString(),
       };
 
-      // ✅ UPDATED: Add both chunks as separate Content messages
-      setConversation((prev) => ({
-        ...prev,
-        messages: [
-          ...prev.messages,
-          { chunks: [toolCallChunk] },
-          { chunks: [toolResultChunk] },
-        ],
-        updatedAt: new Date(),
-      }));
+      // ✅ UPDATED: Add both chunks to assistant message
+      setConversation((prev) => {
+        const assistantMessageIndex = getOrCreateAssistantMessage();
+
+        if (assistantMessageIndex >= 0) {
+          // Add to existing assistant message
+          const newMessages = [...prev.messages];
+          newMessages[assistantMessageIndex] = {
+            ...newMessages[assistantMessageIndex],
+            chunks: [
+              ...newMessages[assistantMessageIndex].chunks,
+              toolCallChunk,
+              toolResultChunk,
+            ],
+          };
+          return {
+            ...prev,
+            messages: newMessages,
+            updatedAt: new Date(),
+          };
+        } else {
+          // Create new assistant message with both chunks
+          return {
+            ...prev,
+            messages: [
+              ...prev.messages,
+              { chunks: [toolCallChunk, toolResultChunk] },
+            ],
+            updatedAt: new Date(),
+          };
+        }
+      });
 
       // Hide tool editor after successful execution
       setShowToolEditor(false);
@@ -707,16 +769,38 @@ const ToolTrainer = () => {
         timestamp: new Date().toISOString(),
       };
 
-      // ✅ UPDATED: Add error chunks as separate Content messages
-      setConversation((prev) => ({
-        ...prev,
-        messages: [
-          ...prev.messages,
-          { chunks: [toolCallChunk] },
-          { chunks: [toolResultChunk] },
-        ],
-        updatedAt: new Date(),
-      }));
+      // ✅ UPDATED: Add error chunks to assistant message
+      setConversation((prev) => {
+        const assistantMessageIndex = getOrCreateAssistantMessage();
+
+        if (assistantMessageIndex >= 0) {
+          // Add to existing assistant message
+          const newMessages = [...prev.messages];
+          newMessages[assistantMessageIndex] = {
+            ...newMessages[assistantMessageIndex],
+            chunks: [
+              ...newMessages[assistantMessageIndex].chunks,
+              toolCallChunk,
+              toolResultChunk,
+            ],
+          };
+          return {
+            ...prev,
+            messages: newMessages,
+            updatedAt: new Date(),
+          };
+        } else {
+          // Create new assistant message with both chunks
+          return {
+            ...prev,
+            messages: [
+              ...prev.messages,
+              { chunks: [toolCallChunk, toolResultChunk] },
+            ],
+            updatedAt: new Date(),
+          };
+        }
+      });
 
       // Hide tool editor after failed execution
       setShowToolEditor(false);
@@ -771,8 +855,8 @@ const ToolTrainer = () => {
         // Check if tool call already exists in conversation to prevent duplicates
         const allChunks = conversation.messages.flatMap((m) => m.chunks);
         const existingToolCall = allChunks.find(
-          (chunk) => 
-            chunk.kind === ChunkKind.TOOL_CALL && 
+          (chunk) =>
+            chunk.kind === ChunkKind.TOOL_CALL &&
             chunk.metadata?.tool_id === toolCall.id
         );
 
@@ -826,16 +910,35 @@ const ToolTrainer = () => {
         }
       });
 
-      // Add all new chunks at once
+      // Add all new chunks at once to assistant message
       if (newChunks.length > 0) {
-        setConversation((prev) => ({
-          ...prev,
-          messages: [
-            ...prev.messages,
-            ...newChunks.map(chunk => ({ chunks: [chunk] })),
-          ],
-          updatedAt: new Date(),
-        }));
+        setConversation((prev) => {
+          const assistantMessageIndex = getOrCreateAssistantMessage();
+
+          if (assistantMessageIndex >= 0) {
+            // Add to existing assistant message
+            const newMessages = [...prev.messages];
+            newMessages[assistantMessageIndex] = {
+              ...newMessages[assistantMessageIndex],
+              chunks: [
+                ...newMessages[assistantMessageIndex].chunks,
+                ...newChunks,
+              ],
+            };
+            return {
+              ...prev,
+              messages: newMessages,
+              updatedAt: new Date(),
+            };
+          } else {
+            // Create new assistant message with all chunks
+            return {
+              ...prev,
+              messages: [...prev.messages, { chunks: newChunks }],
+              updatedAt: new Date(),
+            };
+          }
+        });
       }
 
       // Hide tool editor and show results in conversation area after execution
@@ -856,8 +959,8 @@ const ToolTrainer = () => {
         // Check if tool call already exists to prevent duplicates
         const allChunks = conversation.messages.flatMap((m) => m.chunks);
         const existingToolCall = allChunks.find(
-          (chunk) => 
-            chunk.kind === ChunkKind.TOOL_CALL && 
+          (chunk) =>
+            chunk.kind === ChunkKind.TOOL_CALL &&
             chunk.metadata?.tool_id === toolCall.id
         );
 
@@ -888,15 +991,37 @@ const ToolTrainer = () => {
             timestamp: new Date().toISOString(),
           };
 
-          setConversation((prev) => ({
-            ...prev,
-            messages: [
-              ...prev.messages,
-              { chunks: [toolCallChunk] },
-              { chunks: [toolResultChunk] },
-            ],
-            updatedAt: new Date(),
-          }));
+          setConversation((prev) => {
+            const assistantMessageIndex = getOrCreateAssistantMessage();
+
+            if (assistantMessageIndex >= 0) {
+              // Add to existing assistant message
+              const newMessages = [...prev.messages];
+              newMessages[assistantMessageIndex] = {
+                ...newMessages[assistantMessageIndex],
+                chunks: [
+                  ...newMessages[assistantMessageIndex].chunks,
+                  toolCallChunk,
+                  toolResultChunk,
+                ],
+              };
+              return {
+                ...prev,
+                messages: newMessages,
+                updatedAt: new Date(),
+              };
+            } else {
+              // Create new assistant message with both chunks
+              return {
+                ...prev,
+                messages: [
+                  ...prev.messages,
+                  { chunks: [toolCallChunk, toolResultChunk] },
+                ],
+                updatedAt: new Date(),
+              };
+            }
+          });
         }
       });
     }
@@ -931,7 +1056,7 @@ const ToolTrainer = () => {
   const goBackStep = () => {
     setConversation((prev) => {
       const newMessages = prev.messages.slice(0, -1);
-      
+
       // If we removed the last message and now have no messages, reset turn to user
       if (newMessages.length === 0) {
         setCurrentStep("user");
@@ -939,13 +1064,14 @@ const ToolTrainer = () => {
         setHasAddedTextChunk(false);
       } else {
         // Check if the remaining conversation has any assistant messages
-        const allChunks = newMessages.flatMap(m => m.chunks);
-        const hasAssistantChunks = allChunks.some(chunk => 
-          chunk.role === Role.ASSISTANT || 
-          chunk.kind === ChunkKind.TOOL_CALL || 
-          chunk.kind === ChunkKind.TOOL_RESULT
+        const allChunks = newMessages.flatMap((m) => m.chunks);
+        const hasAssistantChunks = allChunks.some(
+          (chunk) =>
+            chunk.role === Role.ASSISTANT ||
+            chunk.kind === ChunkKind.TOOL_CALL ||
+            chunk.kind === ChunkKind.TOOL_RESULT
         );
-        
+
         // If no assistant chunks remain, switch to user turn
         if (!hasAssistantChunks) {
           setCurrentStep("user");
@@ -963,7 +1089,7 @@ const ToolTrainer = () => {
           }
         }
       }
-      
+
       return {
         ...prev,
         messages: newMessages,
@@ -973,15 +1099,17 @@ const ToolTrainer = () => {
     // Reset UI states
     setShowTextChunkInput(false);
     setMessageContent("");
-    
+
     // Remove corresponding tool calls if any were removed
-    const allChunks = conversation.messages.flatMap(m => m.chunks);
+    const allChunks = conversation.messages.flatMap((m) => m.chunks);
     const remainingToolIds = allChunks
-      .filter(chunk => chunk.kind === ChunkKind.TOOL_CALL)
-      .map(chunk => chunk.metadata?.tool_id)
+      .filter((chunk) => chunk.kind === ChunkKind.TOOL_CALL)
+      .map((chunk) => chunk.metadata?.tool_id)
       .filter(Boolean);
-    
-    setToolCalls(prev => prev.filter(tc => remainingToolIds.includes(tc.id)));
+
+    setToolCalls((prev) =>
+      prev.filter((tc) => remainingToolIds.includes(tc.id))
+    );
   };
 
   // =============================================================================
@@ -1143,7 +1271,7 @@ const ToolTrainer = () => {
     const toolCallChunks = allChunks.filter(
       (chunk) => chunk.kind === ChunkKind.TOOL_CALL
     );
-    
+
     // Re-execute all tool calls
     for (const toolCallChunk of toolCallChunks) {
       await handleExecuteIndividualToolCall(toolCallChunk);
@@ -1463,7 +1591,6 @@ const ToolTrainer = () => {
           </Card>
         </div>
 
-
         {/* Main conversation area */}
         <div className="flex-1 flex flex-col bg-gradient-to-b from-gray-900/50 to-gray-800/50">
           {/* Current Step Indicator */}
@@ -1544,97 +1671,99 @@ const ToolTrainer = () => {
                     Execute Updated Conversation
                   </Button>
                 </div>
-              <div className="space-y-6">
-                {conversation.messages.map((msg, msgIdx) =>
-                  msg.chunks.map((chunk, chunkIdx) => {
-                    // Helper to parse tool call content if needed
-                    let toolCallData = null;
-                    if (chunk.kind === ChunkKind.TOOL_CALL) {
-                      try {
-                        toolCallData = chunk.text
-                          ? JSON.parse(chunk.text)
-                          : null;
-                      } catch {}
-                    }
+                <div className="space-y-6">
+                  {conversation.messages.map((msg, msgIdx) =>
+                    msg.chunks.map((chunk, chunkIdx) => {
+                      // Helper to parse tool call content if needed
+                      let toolCallData = null;
+                      if (chunk.kind === ChunkKind.TOOL_CALL) {
+                        try {
+                          toolCallData = chunk.text
+                            ? JSON.parse(chunk.text)
+                            : null;
+                        } catch {}
+                      }
 
-                    // Determine alignment and style
-                    let align = "justify-start";
-                    let bubbleStyle =
-                      "bg-muted text-foreground border border-border";
-                    if (chunk.role === Role.USER) {
-                      align = "justify-end";
-                      bubbleStyle =
-                        "bg-gradient-to-r from-blue-600 to-blue-500 text-white";
-                    } else if (chunk.role === Role.ASSISTANT) {
-                      align = "justify-start";
-                      bubbleStyle =
+                      // Determine alignment and style
+                      let align = "justify-start";
+                      let bubbleStyle =
                         "bg-muted text-foreground border border-border";
-                    }
-                    if (chunk.kind === ChunkKind.TOOL_CALL) {
-                      align = "justify-start";
-                      bubbleStyle =
-                        "bg-gradient-to-r from-green-700 to-green-600 text-white border border-green-500/30";
-                    } else if (chunk.kind === ChunkKind.TOOL_RESULT) {
-                      align = "justify-start";
-                     bubbleStyle =
-                         "bg-gradient-to-r from-green-700 to-green-600 text-white border border-green-500/30";
-                    }
-                    // For code: use CONTENT kind + metadata.subtype === 'code'
-                    else if (
-                      chunk.kind === ChunkKind.CONTENT &&
-                      chunk.metadata?.subtype === "code"
-                    ) {
-                      align = "justify-start";
-                      bubbleStyle =
-                        "bg-green-50 dark:bg-green-950 text-green-800 dark:text-green-200 border border-green-200 dark:border-green-800";
-                    }
+                      if (chunk.role === Role.USER) {
+                        align = "justify-end";
+                        bubbleStyle =
+                          "bg-gradient-to-r from-blue-600 to-blue-500 text-white";
+                      } else if (chunk.role === Role.ASSISTANT) {
+                        align = "justify-start";
+                        bubbleStyle =
+                          "bg-muted text-foreground border border-border";
+                      }
+                      if (chunk.kind === ChunkKind.TOOL_CALL) {
+                        align = "justify-start";
+                        bubbleStyle =
+                          "bg-gradient-to-r from-green-700 to-green-600 text-white border border-green-500/30";
+                      } else if (chunk.kind === ChunkKind.TOOL_RESULT) {
+                        align = "justify-start";
+                        bubbleStyle =
+                          "bg-gradient-to-r from-green-700 to-green-600 text-white border border-green-500/30";
+                      }
+                      // For code: use CONTENT kind + metadata.subtype === 'code'
+                      else if (
+                        chunk.kind === ChunkKind.CONTENT &&
+                        chunk.metadata?.subtype === "code"
+                      ) {
+                        align = "justify-start";
+                        bubbleStyle =
+                          "bg-green-50 dark:bg-green-950 text-green-800 dark:text-green-200 border border-green-200 dark:border-green-800";
+                      }
 
-                    return (
-                         <div
+                      return (
+                        <div
                           key={`${msgIdx}-${chunkIdx}`}
                           className={`flex ${align}`}
                         >
                           <div
                             className={`w-full rounded-2xl p-4 shadow-lg ${bubbleStyle}`}
                           >
-                          <div className="flex items-center gap-2 mb-3">
-                            <div className="w-6 h-6 rounded-full flex items-center justify-center bg-black/20">
-                              {chunk.role === Role.USER && (
-                                <User className="w-4 h-4" />
-                              )}
-                              {chunk.role === Role.ASSISTANT && (
-                                <Bot className="w-4 h-4" />
-                              )}
-                              {chunk.kind === ChunkKind.TOOL_CALL && (
-                                <Settings className="w-4 h-4" />
-                              )}
-                              {chunk.kind === ChunkKind.TOOL_RESULT && (
-                                <CheckCircle className="w-4 h-4" />
-                              )}
-                              {chunk.kind === ChunkKind.CONTENT &&
-                                chunk.metadata?.subtype === "code" && (
-                                  <Code className="w-4 h-4" />
+                            <div className="flex items-center gap-2 mb-3">
+                              <div className="w-6 h-6 rounded-full flex items-center justify-center bg-black/20">
+                                {chunk.role === Role.USER && (
+                                  <User className="w-4 h-4" />
                                 )}
-                              {chunk.kind === ChunkKind.CONTENT &&
-                                !chunk.metadata?.subtype && (
-                                  <MessageSquare className="w-4 h-4" />
+                                {chunk.role === Role.ASSISTANT && (
+                                  <Bot className="w-4 h-4" />
                                 )}
-                            </div>
-                            <span className="font-medium capitalize text-sm">
-                              {/* Show kind as label */}
-                              {chunk.kind === ChunkKind.CONTENT &&
-                              chunk.metadata?.subtype === "code"
-                                ? "code"
-                                : ChunkKind[chunk.kind]
-                                    ?.replace("_", " ")
-                                    .toLowerCase()}
-                            </span>
-                            {chunk.timestamp && (
-                              <span className="text-xs opacity-70 bg-black/20 px-2 py-1 rounded-full">
-                                {new Date(chunk.timestamp).toLocaleTimeString()}
+                                {chunk.kind === ChunkKind.TOOL_CALL && (
+                                  <Settings className="w-4 h-4" />
+                                )}
+                                {chunk.kind === ChunkKind.TOOL_RESULT && (
+                                  <CheckCircle className="w-4 h-4" />
+                                )}
+                                {chunk.kind === ChunkKind.CONTENT &&
+                                  chunk.metadata?.subtype === "code" && (
+                                    <Code className="w-4 h-4" />
+                                  )}
+                                {chunk.kind === ChunkKind.CONTENT &&
+                                  !chunk.metadata?.subtype && (
+                                    <MessageSquare className="w-4 h-4" />
+                                  )}
+                              </div>
+                              <span className="font-medium capitalize text-sm">
+                                {/* Show kind as label */}
+                                {chunk.kind === ChunkKind.CONTENT &&
+                                chunk.metadata?.subtype === "code"
+                                  ? "code"
+                                  : ChunkKind[chunk.kind]
+                                      ?.replace("_", " ")
+                                      .toLowerCase()}
                               </span>
-                            )}
-                          </div>
+                              {chunk.timestamp && (
+                                <span className="text-xs opacity-70 bg-black/20 px-2 py-1 rounded-full">
+                                  {new Date(
+                                    chunk.timestamp
+                                  ).toLocaleTimeString()}
+                                </span>
+                              )}
+                            </div>
                             {/* Message content */}
                             {chunk.kind === ChunkKind.TOOL_CALL ? (
                               <div className="space-y-3">
@@ -1677,7 +1806,9 @@ import json
                                 />
                                 {/* Execute individual tool call button */}
                                 <Button
-                                  onClick={() => handleExecuteIndividualToolCall(chunk)}
+                                  onClick={() =>
+                                    handleExecuteIndividualToolCall(chunk)
+                                  }
                                   disabled={executeToolMutation.isPending}
                                   size="sm"
                                   className="bg-green-600 hover:bg-green-700 text-white"
@@ -1691,60 +1822,60 @@ import json
                                 </Button>
                               </div>
                             ) : chunk.kind === ChunkKind.TOOL_RESULT ||
-                             (chunk.kind === ChunkKind.CONTENT &&
-                               chunk.metadata?.subtype === "code") ? (
-                             // Editable for TOOL_RESULT and code CONTENT
-                             <textarea
-                               className={
-                                 chunk.kind === ChunkKind.TOOL_RESULT
-                                   ? "text-xs text-green-300 bg-gray-900/60 p-2 rounded border border-gray-700/50 font-mono overflow-x-auto w-full"
-                                   : "bg-gray-900 text-green-400 p-3 rounded text-sm w-full font-mono"
-                               }
-                               value={chunk.text}
-                               onChange={(e) =>
-                                 handleEditChunkText(
-                                   msgIdx,
-                                   chunkIdx,
-                                   e.target.value
-                                 )
-                               }
-                               rows={
-                                 chunk.kind === ChunkKind.TOOL_RESULT ? 4 : 6
-                               }
-                             />
-                          ) : chunk.kind === ChunkKind.CONTENT ? (
-                            // Editable for normal CONTENT (user/assistant text)
-                            <textarea
-                              className="whitespace-pre-wrap leading-relaxed bg-muted rounded p-2 w-full text-foreground"
-                              value={chunk.text}
-                              onChange={(e) =>
-                                handleEditChunkText(
-                                  msgIdx,
-                                  chunkIdx,
-                                  e.target.value
-                                )
-                              }
-                              rows={3}
-                            />
-                          ) : (
-                            // Fallback for any other kind
-                            <p className="whitespace-pre-wrap leading-relaxed">
-                              {chunk.text}
-                            </p>
-                          )}
-                          {/* Metadata */}
-                          {chunk.metadata &&
-                            Object.keys(chunk.metadata).length > 0 && (
-                              <div className="mt-2 text-xs text-muted-foreground">
-                                <strong>Metadata:</strong>{" "}
-                                {JSON.stringify(chunk.metadata, null, 2)}
-                              </div>
+                              (chunk.kind === ChunkKind.CONTENT &&
+                                chunk.metadata?.subtype === "code") ? (
+                              // Editable for TOOL_RESULT and code CONTENT
+                              <textarea
+                                className={
+                                  chunk.kind === ChunkKind.TOOL_RESULT
+                                    ? "text-xs text-green-300 bg-gray-900/60 p-2 rounded border border-gray-700/50 font-mono overflow-x-auto w-full"
+                                    : "bg-gray-900 text-green-400 p-3 rounded text-sm w-full font-mono"
+                                }
+                                value={chunk.text}
+                                onChange={(e) =>
+                                  handleEditChunkText(
+                                    msgIdx,
+                                    chunkIdx,
+                                    e.target.value
+                                  )
+                                }
+                                rows={
+                                  chunk.kind === ChunkKind.TOOL_RESULT ? 4 : 6
+                                }
+                              />
+                            ) : chunk.kind === ChunkKind.CONTENT ? (
+                              // Editable for normal CONTENT (user/assistant text)
+                              <textarea
+                                className="whitespace-pre-wrap leading-relaxed bg-muted rounded p-2 w-full text-foreground"
+                                value={chunk.text}
+                                onChange={(e) =>
+                                  handleEditChunkText(
+                                    msgIdx,
+                                    chunkIdx,
+                                    e.target.value
+                                  )
+                                }
+                                rows={3}
+                              />
+                            ) : (
+                              // Fallback for any other kind
+                              <p className="whitespace-pre-wrap leading-relaxed">
+                                {chunk.text}
+                              </p>
                             )}
+                            {/* Metadata */}
+                            {chunk.metadata &&
+                              Object.keys(chunk.metadata).length > 0 && (
+                                <div className="mt-2 text-xs text-muted-foreground">
+                                  <strong>Metadata:</strong>{" "}
+                                  {JSON.stringify(chunk.metadata, null, 2)}
+                                </div>
+                              )}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })
-                )}
+                      );
+                    })
+                  )}
                 </div>
               </div>
             )}
@@ -1792,171 +1923,175 @@ import json
           )}
 
           {/* Tool Call Editors - Show when there are tool calls and editor is visible */}
-          {currentStep === "assistant" && toolCalls.length > 0 && showToolEditor && (
-            <div className="border-t border-gray-700/50 bg-gradient-to-r from-gray-800/90 to-gray-700/90 backdrop-blur p-6 shadow-lg max-h-96 overflow-y-auto">
-              <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-lg font-medium text-white flex items-center">
-                    <Settings className="w-5 h-5 mr-2 text-green-400" />
-                    Tool Calls ({toolCalls.length})
-                  </h4>
-                </div>
+          {currentStep === "assistant" &&
+            toolCalls.length > 0 &&
+            showToolEditor && (
+              <div className="border-t border-gray-700/50 bg-gradient-to-r from-gray-800/90 to-gray-700/90 backdrop-blur p-6 shadow-lg max-h-96 overflow-y-auto">
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-lg font-medium text-white flex items-center">
+                      <Settings className="w-5 h-5 mr-2 text-green-400" />
+                      Tool Calls ({toolCalls.length})
+                    </h4>
+                  </div>
 
-                {toolCalls.map((toolCall, index) => (
-                  <div
-                    key={toolCall.id}
-                    className="bg-gradient-to-r from-gray-700/80 to-gray-600/80 rounded-xl p-6 border border-gray-600/50 shadow-lg"
-                  >
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center">
-                        <Settings className="w-4 h-4 text-green-400" />
-                      </div>
-                      <label className="text-sm font-medium text-foreground">
-                        Tool Call {index + 1}
-                      </label>
-                      <Badge
-                        variant={
-                          toolCall.status === "completed"
-                            ? "default"
-                            : toolCall.status === "failed"
-                            ? "destructive"
-                            : toolCall.status === "executing"
-                            ? "secondary"
-                            : "outline"
-                        }
-                        className={`text-xs ${
-                          toolCall.status === "completed"
-                            ? "bg-green-500/20 text-green-300 border-green-400/50"
-                            : toolCall.status === "failed"
-                            ? "bg-red-500/20 text-red-300 border-red-400/50"
-                            : toolCall.status === "executing"
-                            ? "bg-yellow-500/20 text-yellow-300 border-yellow-400/50"
-                            : "bg-gray-500/20 text-gray-300 border-gray-400/50"
-                        }`}
-                      >
-                        {toolCall.status === "executing" && (
-                          <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                        )}
-                        {toolCall.status === "completed" && (
-                          <CheckCircle className="w-3 h-3 mr-1" />
-                        )}
-                        {toolCall.status === "failed" && (
-                          <AlertTriangle className="w-3 h-3 mr-1" />
-                        )}
-                        {toolCall.status}
-                      </Badge>
-                      <Button
-                        onClick={() => removeToolCall(index)}
-                        variant="ghost"
-                        size="sm"
-                        className="ml-auto text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all duration-200"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4 mb-4">
-                      <div className="space-y-2">
-                        <label className="text-sm text-foreground font-medium">
-                          Tool Name
+                  {toolCalls.map((toolCall, index) => (
+                    <div
+                      key={toolCall.id}
+                      className="bg-gradient-to-r from-gray-700/80 to-gray-600/80 rounded-xl p-6 border border-gray-600/50 shadow-lg"
+                    >
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center">
+                          <Settings className="w-4 h-4 text-green-400" />
+                        </div>
+                        <label className="text-sm font-medium text-foreground">
+                          Tool Call {index + 1}
                         </label>
-                        <Select
-                          value={toolCall.toolName}
-                          onValueChange={(value) =>
-                            updateToolCall(index, { toolName: value })
+                        <Badge
+                          variant={
+                            toolCall.status === "completed"
+                              ? "default"
+                              : toolCall.status === "failed"
+                              ? "destructive"
+                              : toolCall.status === "executing"
+                              ? "secondary"
+                              : "outline"
                           }
+                          className={`text-xs ${
+                            toolCall.status === "completed"
+                              ? "bg-green-500/20 text-green-300 border-green-400/50"
+                              : toolCall.status === "failed"
+                              ? "bg-red-500/20 text-red-300 border-red-400/50"
+                              : toolCall.status === "executing"
+                              ? "bg-yellow-500/20 text-yellow-300 border-yellow-400/50"
+                              : "bg-gray-500/20 text-gray-300 border-gray-400/50"
+                          }`}
                         >
-                          <SelectTrigger className="bg-gray-600/80 border-gray-500/50 text-white focus:border-blue-400/50 transition-colors">
-                            <SelectValue placeholder="Select tool..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {availableTools.map((tool) => (
-                              <SelectItem
-                                key={tool.tool_name}
-                                value={tool.tool_name}
-                              >
-                                {tool.tool_name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          {toolCall.status === "executing" && (
+                            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                          )}
+                          {toolCall.status === "completed" && (
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                          )}
+                          {toolCall.status === "failed" && (
+                            <AlertTriangle className="w-3 h-3 mr-1" />
+                          )}
+                          {toolCall.status}
+                        </Badge>
+                        <Button
+                          onClick={() => removeToolCall(index)}
+                          variant="ghost"
+                          size="sm"
+                          className="ml-auto text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all duration-200"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       </div>
 
-                      <div className="space-y-2">
-                        <label className="text-sm text-foreground font-medium">
-                          Parameters (JSON)
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div className="space-y-2">
+                          <label className="text-sm text-foreground font-medium">
+                            Tool Name
+                          </label>
+                          <Select
+                            value={toolCall.toolName}
+                            onValueChange={(value) =>
+                              updateToolCall(index, { toolName: value })
+                            }
+                          >
+                            <SelectTrigger className="bg-gray-600/80 border-gray-500/50 text-white focus:border-blue-400/50 transition-colors">
+                              <SelectValue placeholder="Select tool..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableTools.map((tool) => (
+                                <SelectItem
+                                  key={tool.tool_name}
+                                  value={tool.tool_name}
+                                >
+                                  {tool.tool_name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-sm text-foreground font-medium">
+                            Parameters (JSON)
+                          </label>
+                          <Input
+                            value={JSON.stringify(toolCall.parameters)}
+                            onChange={(e) => {
+                              try {
+                                const params = JSON.parse(e.target.value);
+                                updateToolCall(index, { parameters: params });
+                              } catch {}
+                            }}
+                            placeholder='{"param": "value"}'
+                            className="bg-gray-600/80 border-gray-500/50 text-white placeholder:text-gray-400 focus:border-blue-400/50 transition-colors font-mono"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 mb-4">
+                        <label className="text-sm text-foreground font-medium flex items-center">
+                          <Code className="w-4 h-4 mr-1 text-blue-400" />
+                          Python Code *
                         </label>
-                        <Input
-                          value={JSON.stringify(toolCall.parameters)}
-                          onChange={(e) => {
-                            try {
-                              const params = JSON.parse(e.target.value);
-                              updateToolCall(index, { parameters: params });
-                            } catch {}
-                          }}
-                          placeholder='{"param": "value"}'
-                          className="bg-gray-600/80 border-gray-500/50 text-white placeholder:text-gray-400 focus:border-blue-400/50 transition-colors font-mono"
+                        <Textarea
+                          value={toolCall.pythonCode}
+                          onChange={(e) =>
+                            updateToolCall(index, {
+                              pythonCode: e.target.value,
+                            })
+                          }
+                          placeholder="# Write Python code here&#10;import requests&#10;import json&#10;&#10;# Your code here..."
+                          className="min-h-[140px] bg-gray-600/80 border-gray-500/50 text-white font-mono text-sm placeholder:text-gray-400 focus:border-blue-400/50 transition-colors"
                         />
                       </div>
-                    </div>
 
-                    <div className="space-y-2 mb-4">
-                      <label className="text-sm text-foreground font-medium flex items-center">
-                        <Code className="w-4 h-4 mr-1 text-blue-400" />
-                        Python Code *
-                      </label>
-                      <Textarea
-                        value={toolCall.pythonCode}
-                        onChange={(e) =>
-                          updateToolCall(index, { pythonCode: e.target.value })
+                      <div className="space-y-2 mb-4">
+                        <label className="text-sm text-foreground font-medium flex items-center">
+                          <CheckCircle className="w-4 h-4 mr-1 text-green-400" />
+                          Tool Result
+                        </label>
+                        <Textarea
+                          value={toolCall.result}
+                          onChange={(e) =>
+                            handleToolResultEdit(index, e.target.value)
+                          }
+                          placeholder="Edit tool result for ground truth and evals"
+                          className="min-h-[100px] bg-gray-600/80 border-gray-500/50 text-white font-mono text-sm placeholder:text-gray-400 focus:border-blue-400/50 transition-colors"
+                        />
+                      </div>
+
+                      <Button
+                        onClick={() => executeToolCall(index)}
+                        disabled={
+                          !toolCall.pythonCode.trim() ||
+                          toolCall.status === "executing" ||
+                          toolCall.status === "completed"
                         }
-                        placeholder="# Write Python code here&#10;import requests&#10;import json&#10;&#10;# Your code here..."
-                        className="min-h-[140px] bg-gray-600/80 border-gray-500/50 text-white font-mono text-sm placeholder:text-gray-400 focus:border-blue-400/50 transition-colors"
-                      />
+                        className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white disabled:opacity-50 shadow-lg transition-all duration-200"
+                      >
+                        {toolCall.status === "executing" ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : toolCall.status === "completed" ? (
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                        ) : (
+                          <Play className="w-4 h-4 mr-2" />
+                        )}
+                        {toolCall.status === "executing"
+                          ? "Executing..."
+                          : toolCall.status === "completed"
+                          ? "Executed"
+                          : "Get Result"}
+                      </Button>
                     </div>
-
-                    <div className="space-y-2 mb-4">
-                      <label className="text-sm text-foreground font-medium flex items-center">
-                        <CheckCircle className="w-4 h-4 mr-1 text-green-400" />
-                        Tool Result
-                      </label>
-                      <Textarea
-                        value={toolCall.result}
-                        onChange={(e) =>
-                          handleToolResultEdit(index, e.target.value)
-                        }
-                        placeholder="Edit tool result for ground truth and evals"
-                        className="min-h-[100px] bg-gray-600/80 border-gray-500/50 text-white font-mono text-sm placeholder:text-gray-400 focus:border-blue-400/50 transition-colors"
-                      />
-                    </div>
-
-                    <Button
-                      onClick={() => executeToolCall(index)}
-                      disabled={
-                        !toolCall.pythonCode.trim() ||
-                        toolCall.status === "executing" ||
-                        toolCall.status === "completed"
-                      }
-                      className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white disabled:opacity-50 shadow-lg transition-all duration-200"
-                    >
-                      {toolCall.status === "executing" ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : toolCall.status === "completed" ? (
-                        <CheckCircle className="w-4 h-4 mr-2" />
-                      ) : (
-                        <Play className="w-4 h-4 mr-2" />
-                      )}
-                      {toolCall.status === "executing"
-                        ? "Executing..."
-                        : toolCall.status === "completed"
-                        ? "Executed"
-                        : "Get Result"}
-                    </Button>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
         </div>
 
         {/* INLINE ACTION BUTTONS - All buttons in one horizontal row */}
