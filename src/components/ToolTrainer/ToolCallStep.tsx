@@ -1,4 +1,20 @@
 
+/**
+ * ToolCallStep Component
+ * 
+ * This component represents a single tool call step in the training example builder.
+ * It provides an interface for configuring tool parameters, executing tools, and managing results.
+ * 
+ * Key Features:
+ * - Dynamic tool selection from available tools
+ * - Schema-driven parameter validation and input generation
+ * - Real-time Python code execution
+ * - Tool result editing and validation
+ * - Visual feedback for execution status and validation errors
+ * 
+ * @component
+ */
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,17 +28,31 @@ import { useToolSchema, useExecuteToolResult } from '@/hooks/useApi';
 import { Tool } from '@/services/api';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
+/**
+ * Props interface for the ToolCallStep component
+ */
 interface ToolCallStepProps {
+  /** Index of this step in the sequence (for display purposes) */
   stepIndex: number;
+  /** Currently selected tool name */
   toolName: string;
+  /** Current tool parameters object */
   parameters: Record<string, any>;
+  /** Current tool execution result */
   toolResult: string;
+  /** Array of available tools to choose from */
   availableTools: Tool[];
+  /** Callback fired when tool name changes */
   onToolNameChange: (toolName: string) => void;
+  /** Callback fired when parameters change */
   onParametersChange: (parameters: Record<string, any>) => void;
+  /** Callback fired when tool result changes */
   onToolResultChange: (result: string) => void;
+  /** Callback fired when delete button is clicked */
   onDelete: () => void;
+  /** Callback fired when tool execution completes */
   onExecute: () => void;
+  /** Whether this step has validation errors */
   hasErrors?: boolean;
 }
 

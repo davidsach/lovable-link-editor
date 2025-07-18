@@ -1,4 +1,21 @@
 
+/**
+ * EditExample Component
+ * 
+ * A modal dialog component for editing existing training examples.
+ * Allows users to modify example metadata such as name, description, and tags
+ * while preserving the conversation content.
+ * 
+ * Key Features:
+ * - Modal dialog interface for focused editing
+ * - Form validation for required fields
+ * - Real-time API integration for updates
+ * - Tag management with comma-separated input
+ * - Error handling and user feedback
+ * 
+ * @component
+ */
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -8,8 +25,13 @@ import { Label } from '@/components/ui/label';
 import { Edit, Loader2, Save } from 'lucide-react';
 import { Example } from '../../types/toolTrainer';
 
+/**
+ * Props interface for the EditExample component
+ */
 interface EditExampleProps {
+  /** The current example being edited */
   currentExample: Example;
+  /** Callback fired when example is successfully updated */
   onExampleUpdated: (updatedExample: Example) => void;
 }
 

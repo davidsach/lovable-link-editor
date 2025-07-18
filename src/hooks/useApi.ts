@@ -1,7 +1,26 @@
 
 /**
- * React Query Hooks for API Operations
- * Custom hooks for data fetching and mutations with error handling
+ * API Hooks for Tool Trainer Application
+ * 
+ * This module provides React Query hooks for all API operations in the application.
+ * It includes hooks for tool management, example management, and various utility operations.
+ * 
+ * Key Features:
+ * - Automatic caching and synchronization with React Query
+ * - Built-in error handling and user feedback via toasts
+ * - Type-safe API operations
+ * - Optimistic updates where appropriate
+ * - Proper loading and error states
+ * 
+ * Hook Categories:
+ * - Tool hooks: useTools, useToolSchema, useExecuteToolResult, etc.
+ * - Example hooks: useExamples, useCreateExample, useUpdateExample, etc.
+ * - File operation hooks: useSaveToMarkdown, useLoadFromMarkdown
+ * 
+ * All hooks follow React Query patterns and include proper error handling
+ * with user-friendly toast notifications.
+ * 
+ * @fileoverview React Query hooks for API operations
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -273,7 +292,7 @@ export const useSaveToMarkdown = () => {
   return useMutation({
     mutationFn: ({ filePath, example }: { filePath: string; example: CreateExampleRequest }) => {
       console.log('📝 Saving example to markdown:', filePath);
-      return examplesApi.saveToMarkdown(filePath, example);
+      return examplesApi.saveToJSON(filePath, example);
     },
     onSuccess: (data, variables) => {
       console.log('✅ Example saved to markdown successfully:', variables.filePath);
@@ -309,7 +328,7 @@ export const useLoadFromMarkdown = () => {
   return useMutation({
     mutationFn: (filePath: string) => {
       console.log('📖 Loading example from markdown:', filePath);
-      return examplesApi.loadFromMarkdown(filePath);
+      return examplesApi.loadFromJSON(filePath);
     },
     onSuccess: (data, filePath) => {
       console.log('✅ Example loaded from markdown successfully:', filePath);

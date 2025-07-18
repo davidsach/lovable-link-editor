@@ -1,4 +1,21 @@
 
+/**
+ * ToolCallEditor Component
+ * 
+ * A specialized code editor for Python tool call code with real-time validation.
+ * This component provides syntax highlighting, error detection, and helpful formatting
+ * for writing Python code that calls LLM tools.
+ * 
+ * Key Features:
+ * - Real-time Python syntax validation
+ * - Visual error and warning indicators
+ * - Contextual help and examples
+ * - Automatic code formatting suggestions
+ * - Integration with tool schema validation
+ * 
+ * @component
+ */
+
 import React, { useState, useEffect } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -8,10 +25,17 @@ import { AlertTriangle, CheckCircle, Info, HelpCircle } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { validatePythonCode, PythonValidationResult } from '@/utils/validation';
 
+/**
+ * Props interface for the ToolCallEditor component
+ */
 interface ToolCallEditorProps {
+  /** Current Python code value */
   value: string;
+  /** Callback fired when code changes */
   onChange: (value: string) => void;
+  /** Additional CSS classes to apply */
   className?: string;
+  /** Callback fired when validation status changes */
   onValidationChange?: (isValid: boolean) => void;
 }
 

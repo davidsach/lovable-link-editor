@@ -1,17 +1,59 @@
 
+/**
+ * Validation Utilities for Tool Trainer
+ * 
+ * This module provides validation functions for Python code and other user inputs
+ * in the tool trainer application. It includes safety checks, syntax validation,
+ * and helpful error messages for common issues.
+ * 
+ * Key Features:
+ * - Python code syntax validation
+ * - Security checks for unsafe operations
+ * - Line-by-line error reporting
+ * - Warnings for potential issues
+ * - User-friendly error messages
+ * 
+ * @fileoverview Validation utilities for code and input validation
+ */
+
+/**
+ * Base interface for validation results
+ */
 export interface ValidationResult {
+  /** Whether the input passed validation */
   isValid: boolean;
+  /** Array of error messages */
   errors: string[];
+  /** Array of warning messages */
   warnings: string[];
 }
 
+/**
+ * Extended validation result interface for Python code validation
+ * Includes line-specific syntax error information
+ */
 export interface PythonValidationResult extends ValidationResult {
+  /** Array of syntax errors with line numbers */
   syntaxErrors: Array<{
+    /** Line number where the error occurs (1-indexed) */
     line: number;
+    /** Human-readable error message */
     message: string;
   }>;
 }
 
+/**
+ * Validates Python code for security, syntax, and best practices
+ * 
+ * This function performs comprehensive validation of Python code including:
+ * - Basic syntax checking
+ * - Security vulnerability detection
+ * - Common error pattern detection
+ * - Style and best practice warnings
+ * 
+ * @param code - The Python code string to validate
+ * @returns Detailed validation result with errors, warnings, and syntax errors
+ */
 export const validatePythonCode = (code: string): PythonValidationResult => {
   const errors: string[] = [];
   const warnings: string[] = [];

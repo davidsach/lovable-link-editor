@@ -197,6 +197,14 @@ interface ToolCall {
   status: "pending" | "executing" | "completed" | "failed";
 }
 
+/**
+ * Synchronizes tool results from the toolCalls state with the conversation messages.
+ * This ensures that any edited tool results in the tool editor are reflected in the conversation display.
+ * 
+ * @param messages - Array of conversation messages with chunks
+ * @param toolCalls - Array of current tool call objects with potentially updated results
+ * @returns Updated messages array with synchronized tool results
+ */
 function syncToolResultsWithMessages(messages, toolCalls) {
   return messages.map((msg) => ({
     ...msg,
@@ -212,6 +220,31 @@ function syncToolResultsWithMessages(messages, toolCalls) {
   }));
 }
 
+/**
+ * ToolTrainer Component
+ * 
+ * This is the main component for the LLM Tool Training Platform. It provides an interface
+ * for creating, editing, and managing training examples for Large Language Model tool usage.
+ * 
+ * Key Features:
+ * - Interactive conversation builder (user messages, assistant messages, tool calls)
+ * - Real-time tool call execution and result management
+ * - Tool call editing with Python code validation
+ * - Conversation step navigation (back/forward)
+ * - Save/load training examples to/from database
+ * - Tool schema validation and parameter management
+ * 
+ * Main State Management:
+ * - conversation: Current conversation being built with messages and chunks
+ * - toolCalls: Array of tool calls with their execution state and results
+ * - currentStep: Whether we're on user turn or assistant turn
+ * - Various UI state flags for modals, editors, etc.
+ * 
+ * Recent Bug Fixes:
+ * - Fixed "Get All Results" to use edited tool call data instead of stale state
+ * - Fixed "Back Step" to properly sync tool calls with remaining conversation
+ * - Added proper tool call state synchronization throughout the component
+ */
 const ToolTrainer = () => {
   // =============================================================================
   // STATE MANAGEMENT
@@ -807,18 +840,55 @@ const ToolTrainer = () => {
     }
   };
 
+  /**
+   * Executes all tool calls that have valid Python code.
+   * This function retrieves the most current edited versions of tool calls from the conversation state
+   * and executes them, ensuring that any edits made to tool calls are properly reflected in the results.
+   * 
+   * Issues Fixed:
+   * - Now properly uses edited tool call data from conversation messages
+   * - Synchronizes results with both toolCalls state and conversation messages
+   * - Prevents duplicate tool calls in conversation history
+   */
   const executeAllToolCalls = async () => {
+    // Get the current tool calls with their latest edited Python code from conversation messages
+    const allChunks = conversation.messages.flatMap((m) => m.chunks);
+    const toolCallChunks = allChunks.filter(chunk => chunk.kind === ChunkKind.TOOL_CALL);
+    
+    // Build updated tool calls from conversation state (includes edits)
+    const updatedToolCalls = toolCallChunks.map(chunk => {
+      const toolData = JSON.parse(chunk.text || '{}');
+      const existingToolCall = toolCalls.find(tc => tc.id === chunk.metadata?.tool_id);
+      
+      return {
+        id: chunk.metadata?.tool_id || `tool_${Date.now()}`,
+        toolName: toolData.tool_name || '',
+        parameters: toolData.parameters || {},
+        pythonCode: toolData.python_code || '',
+        result: existingToolCall?.result || '',
+        status: existingToolCall?.status || 'pending' as const
+      };
+    });
+
     // Filter tool calls that have code
-    const toolCallsWithCode = toolCalls.filter((tc) => tc.pythonCode.trim());
+    const toolCallsWithCode = updatedToolCalls.filter((tc) => tc.pythonCode.trim());
 
     if (toolCallsWithCode.length === 0) {
       return;
     }
 
+    // Update toolCalls state with current conversation data before execution
+    setToolCalls(updatedToolCalls);
+
     // Set all tool calls to executing status
-    toolCallsWithCode.forEach((toolCall, index) => {
-      const originalIndex = toolCalls.findIndex((tc) => tc.id === toolCall.id);
-      updateToolCall(originalIndex, { status: "executing" });
+    toolCallsWithCode.forEach((toolCall) => {
+      const originalIndex = updatedToolCalls.findIndex((tc) => tc.id === toolCall.id);
+      if (originalIndex >= 0) {
+        const toolCallsIndex = toolCalls.findIndex((tc) => tc.id === toolCall.id);
+        if (toolCallsIndex >= 0) {
+          updateToolCall(toolCallsIndex, { status: "executing" });
+        }
+      }
     });
 
     try {
@@ -1053,6 +1123,15 @@ const ToolTrainer = () => {
     return conversation.messages.length > 0;
   };
 
+  /**
+   * Goes back one step in the conversation by removing the last message.
+   * This function properly manages both conversation state and tool calls state.
+   * 
+   * Issues Fixed:
+   * - Now properly syncs tool calls state with the remaining conversation after step back
+   * - Correctly determines the current turn (user/assistant) based on remaining messages
+   * - Cleans up tool calls that are no longer present in the conversation
+   */
   const goBackStep = () => {
     setConversation((prev) => {
       const newMessages = prev.messages.slice(0, -1);
@@ -1062,6 +1141,8 @@ const ToolTrainer = () => {
         setCurrentStep("user");
         setConversationStarted(false);
         setHasAddedTextChunk(false);
+        // Clear all tool calls when conversation is empty
+        setToolCalls([]);
       } else {
         // Check if the remaining conversation has any assistant messages
         const allChunks = newMessages.flatMap((m) => m.chunks);
@@ -1088,6 +1169,16 @@ const ToolTrainer = () => {
             setHasAddedTextChunk(true);
           }
         }
+
+        // Synchronize tool calls with remaining conversation
+        const remainingToolIds = allChunks
+          .filter((chunk) => chunk.kind === ChunkKind.TOOL_CALL)
+          .map((chunk) => chunk.metadata?.tool_id)
+          .filter(Boolean);
+
+        setToolCalls((prev) =>
+          prev.filter((tc) => remainingToolIds.includes(tc.id))
+        );
       }
 
       return {
@@ -1099,17 +1190,6 @@ const ToolTrainer = () => {
     // Reset UI states
     setShowTextChunkInput(false);
     setMessageContent("");
-
-    // Remove corresponding tool calls if any were removed
-    const allChunks = conversation.messages.flatMap((m) => m.chunks);
-    const remainingToolIds = allChunks
-      .filter((chunk) => chunk.kind === ChunkKind.TOOL_CALL)
-      .map((chunk) => chunk.metadata?.tool_id)
-      .filter(Boolean);
-
-    setToolCalls((prev) =>
-      prev.filter((tc) => remainingToolIds.includes(tc.id))
-    );
   };
 
   // =============================================================================

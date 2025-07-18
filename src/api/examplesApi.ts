@@ -184,6 +184,25 @@
 // export default examplesApi;
 
 
+/**
+ * Examples API Module
+ * 
+ * This module provides all API functions for managing training examples.
+ * It supports both database operations and file-based operations (JSON).
+ * 
+ * Database Operations:
+ * - CRUD operations for examples stored in the backend database
+ * - Full example management with metadata, timestamps, etc.
+ * 
+ * File Operations:
+ * - Save/load examples as JSON files for backup and sharing
+ * - Useful for version control and offline storage
+ * 
+ * All functions include proper error handling, logging, and type safety.
+ * 
+ * @fileoverview API functions for managing training examples
+ */
+
 import { apiClient } from './client';
 import { ENDPOINTS } from './endpoints';
 import { 
@@ -197,6 +216,10 @@ import {
 // EXAMPLES API OBJECT
 // =============================================================================
 
+/**
+ * Examples API object containing all example-related operations
+ * Organized into database operations and file operations
+ */
 export const examplesApi = {
 
   // ---------------------------------------------------------------------------

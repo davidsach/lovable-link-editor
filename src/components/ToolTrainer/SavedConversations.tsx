@@ -1,4 +1,22 @@
 
+/**
+ * SavedConversations Component
+ * 
+ * This component provides a modal interface for browsing, loading, and managing
+ * saved training examples from the database. It displays a list of all saved
+ * conversations with metadata and provides options to load, delete, or download them.
+ * 
+ * Key Features:
+ * - Modal dialog with searchable list of saved examples
+ * - Preview of conversation metadata (name, description, tags, timestamps)
+ * - Load functionality to restore conversations into the trainer
+ * - Delete functionality with confirmation dialogs
+ * - Export/download functionality for backup
+ * - Real-time refresh when examples are modified
+ * 
+ * @component
+ */
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,7 +31,11 @@ import { examplesApi } from '../../api';
 import { useToast } from '../../hooks/use-toast';
 
 
+/**
+ * Props interface for the SavedConversations component
+ */
 interface SavedConversationsProps {
+  /** Callback fired when a conversation is selected for loading */
   onLoadConversation: (conversation: Example) => void;
 }
 
