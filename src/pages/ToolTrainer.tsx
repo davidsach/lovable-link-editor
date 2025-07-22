@@ -316,7 +316,16 @@ const ToolTrainer = () => {
     }
   }, [conversation.messages]);
 
-  // ✅ ADDED: Helper functions for creating chunks
+  /**
+   * Creates a new chunk object with the specified parameters.
+   * Used throughout the application for creating conversation chunks.
+   * 
+   * @param text - The text content of the chunk
+   * @param kind - The type of chunk (ChunkKind enum)
+   * @param role - The role of the chunk (user/assistant)
+   * @param metadata - Additional metadata for the chunk
+   * @returns A properly formatted Chunk object
+   */
   const createContentChunk = (
     text: string,
     kind: ChunkKind,
@@ -330,11 +339,16 @@ const ToolTrainer = () => {
     timestamp: new Date().toISOString(),
   });
 
+  /**
+   * Creates a new content message containing an array of chunks.
+   * Each message represents a conversational turn with one or more chunks.
+   * 
+   * @param chunks - Array of chunks to include in the message
+   * @returns A Content object containing the chunks
+   */
   const createContentMessage = (chunks: Chunk[]): Content => ({
     chunks,
   });
-
-  // ✅ ADDED: Tag management functions
 
   // =============================================================================
   // API HOOKS
@@ -355,6 +369,12 @@ const ToolTrainer = () => {
   // UI HELPER FUNCTIONS
   // =============================================================================
 
+  /**
+   * Toggles the expansion state of a tool in the sidebar.
+   * Used to show/hide detailed tool information and parameters.
+   * 
+   * @param toolName - Name of the tool to toggle
+   */
   const toggleToolExpansion = (toolName: string) => {
     setExpandedTools((prev) => ({
       ...prev,
@@ -362,6 +382,10 @@ const ToolTrainer = () => {
     }));
   };
 
+  /**
+   * Adds a new tag to the current conversation's metadata.
+   * Tags are used for categorizing and organizing training examples.
+   */
   const addTag = () => {
     if (newTag.trim() && !conversation.meta.tags.includes(newTag.trim())) {
       setConversation((prev) => ({
@@ -375,6 +399,11 @@ const ToolTrainer = () => {
     }
   };
 
+  /**
+   * Removes a tag from the current conversation's metadata.
+   * 
+   * @param tagToRemove - The tag string to remove
+   */
   const removeTag = (tagToRemove: string) => {
     setConversation((prev) => ({
       ...prev,
@@ -385,7 +414,14 @@ const ToolTrainer = () => {
     }));
   };
 
-  // Helper function to generate Python function signature in one line
+  /**
+   * Generates a compact Python function signature for display in the tool list.
+   * Shows function name with parameters in a single line format.
+   * 
+   * @param toolName - Name of the tool
+   * @param func - Function object containing parameters
+   * @returns Formatted Python function signature
+   */
   const generateCompactPythonSignature = (toolName: string, func: any) => {
     const params = func.params
       .map((param: any) => {
@@ -400,22 +436,12 @@ const ToolTrainer = () => {
     return `${toolName}.${func.func_name}(${params})`;
   };
 
-  // Helper function to generate Python function signature
-  const generatePythonSignature = (toolName: string, func: any) => {
-    const params = func.params
-      .map((param: any) => {
-        const paramStr = `${param.param_name}`;
-        if (!param.is_required && param.default_value) {
-          return `${paramStr}="${param.default_value}"`;
-        }
-        return paramStr;
-      })
-      .join(", ");
-
-    return `${toolName}.${func.func_name}(${params})`;
-  };
-
-  // Copy function signature to clipboard
+  /**
+   * Copies a Python function signature to the clipboard wrapped in a print statement.
+   * Used for quickly copying tool function signatures from the tool list.
+   * 
+   * @param signature - The function signature to copy
+   */
   const copySignatureToClipboard = async (signature: string) => {
     try {
       await navigator.clipboard.writeText(`print(${signature})`);
@@ -425,7 +451,13 @@ const ToolTrainer = () => {
     }
   };
 
-  // Handler for editing tool results in the summary area
+  /**
+   * Updates a tool result chunk with new text content.
+   * Used for editing tool execution results in the conversation summary.
+   * 
+   * @param result - The tool result chunk to edit
+   * @param newText - The new text content for the result
+   */
   const handleEditToolResult = (result, newText) => {
     setConversation((prev) => {
       const newMessages = prev.messages.map((msg) => ({
@@ -448,6 +480,14 @@ const ToolTrainer = () => {
     });
   };
 
+  /**
+   * Updates the text content of a specific chunk in the conversation.
+   * Used for inline editing of conversation chunks in the display interface.
+   * 
+   * @param msgIdx - Index of the message containing the chunk
+   * @param chunkIdx - Index of the chunk within the message
+   * @param newText - The new text content for the chunk
+   */
   const handleEditChunkText = (msgIdx, chunkIdx, newText) => {
     setConversation((prev) => {
       const newMessages = [...prev.messages];
@@ -573,7 +613,14 @@ const ToolTrainer = () => {
     setCurrentStep(currentStep === "user" ? "assistant" : "user");
   };
 
-  // Helper function to get or create assistant message
+  /**
+   * Gets the index of the last assistant message or returns -1 if a new message is needed.
+   * This ensures assistant chunks are grouped together in the same message according to
+   * the conversation structure requirements where each turn (user/assistant) creates 
+   * separate messages, but multiple assistant chunks (text, tool calls, results) are grouped.
+   * 
+   * @returns Index of existing assistant message or -1 if new message needed
+   */
   const getOrCreateAssistantMessage = () => {
     const lastMessage = conversation.messages[conversation.messages.length - 1];
 
@@ -589,6 +636,19 @@ const ToolTrainer = () => {
     return -1;
   };
 
+  /**
+   * Adds a text chunk to the current conversation turn.
+   * 
+   * Key behavior:
+   * - User chunks: Always create new messages (each user turn is separate)
+   * - Assistant chunks: Group with existing assistant chunks in same message
+   * 
+   * This implements the required conversation structure where:
+   * - Each user query creates a separate Content message
+   * - All assistant responses (text, tool calls, tool results) are grouped in one Content message
+   * 
+   * @requires messageContent to be non-empty
+   */
   const addTextChunk = () => {
     if (messageContent.trim()) {
       // Create a chunk with the new structure
@@ -653,6 +713,11 @@ const ToolTrainer = () => {
   // TOOL CALL MANAGEMENT
   // =============================================================================
 
+  /**
+   * Adds a new tool call to the current assistant turn.
+   * Prevents adding multiple incomplete tool calls simultaneously to maintain data integrity.
+   * Opens the tool editor interface for configuring the new tool call.
+   */
   const addToolCall = () => {
     // Check if there's already an incomplete tool call
     const hasIncompleteToolCall = toolCalls.some(
@@ -676,6 +741,13 @@ const ToolTrainer = () => {
     setShowToolEditor(true); // Show tool editor when adding a tool call
   };
 
+  /**
+   * Updates a specific tool call with new data.
+   * Used for editing tool call parameters, code, results, and status.
+   * 
+   * @param index - Index of the tool call in the toolCalls array
+   * @param updates - Partial ToolCall object with fields to update
+   */
   const updateToolCall = (index: number, updates: Partial<ToolCall>) => {
     setToolCalls((prev) =>
       prev.map((tc, i) => (i === index ? { ...tc, ...updates } : tc))
@@ -1077,15 +1149,23 @@ const ToolTrainer = () => {
   };
 
   // =============================================================================
-  // NAVIGATION
+  // NAVIGATION FUNCTIONS
   // =============================================================================
 
+  /**
+   * Navigates to the previous example in the sequence.
+   * Used for browsing through multiple training examples.
+   */
   const navigatePrevious = () => {
     if (currentExampleId > 1) {
       setCurrentExampleId(currentExampleId - 1);
     }
   };
 
+  /**
+   * Navigates to the next example in the sequence.
+   * Used for browsing through multiple training examples.
+   */
   const navigateNext = () => {
     setCurrentExampleId(currentExampleId + 1);
   };
@@ -1194,9 +1274,15 @@ const ToolTrainer = () => {
   };
 
   // =============================================================================
-  // VALIDATION FUNCTIONS
+  // VALIDATION FUNCTIONS - UI State Management
   // =============================================================================
 
+  /**
+   * Determines if a new conversation turn can be started.
+   * Enforces turn-based conversation structure.
+   * 
+   * @returns true if user can switch to the next turn (user ↔ assistant)
+   */
   const canStartNewTurn = () => {
     // If conversation hasn't started, can always start new turn
     if (!conversationStarted) return true;
@@ -1210,6 +1296,11 @@ const ToolTrainer = () => {
     }
   };
 
+  /**
+   * Determines if a text chunk can be added to the current turn.
+   * 
+   * @returns true if text input is allowed for the current role
+   */
   const canAddTextChunk = () => {
     if (currentStep === "user") {
       // User can only add one text chunk per turn
@@ -1219,6 +1310,12 @@ const ToolTrainer = () => {
     return true;
   };
 
+  /**
+   * Determines if a new tool call can be added.
+   * Only allows one incomplete tool call at a time to maintain data integrity.
+   * 
+   * @returns true if a tool call can be added
+   */
   const canAddToolCall = () => {
     if (currentStep !== "assistant") return false;
 
@@ -1230,6 +1327,11 @@ const ToolTrainer = () => {
     return !hasIncompleteToolCall;
   };
 
+  /**
+   * Counts tool calls that have code and can be executed.
+   * 
+   * @returns Number of executable tool calls
+   */
   const getExecutableToolCallsCount = () => {
     return toolCalls.filter(
       (tc) =>
@@ -1239,14 +1341,29 @@ const ToolTrainer = () => {
     ).length;
   };
 
+  /**
+   * Counts tool calls currently being executed.
+   * 
+   * @returns Number of tool calls in executing state
+   */
   const getExecutingToolCallsCount = () => {
     return toolCalls.filter((tc) => tc.status === "executing").length;
   };
 
+  /**
+   * Counts tool calls that have Python code (regardless of execution status).
+   * 
+   * @returns Number of tool calls with code
+   */
   const getToolCallsWithCodeCount = () => {
     return toolCalls.filter((tc) => tc.pythonCode.trim()).length;
   };
 
+  /**
+   * Determines if the "Execute All" button should be enabled.
+   * 
+   * @returns true if batch execution is allowed
+   */
   const canExecuteAllToolCalls = () => {
     return (
       toolCalls.some((tc) => tc.pythonCode.trim()) &&
@@ -1507,7 +1624,7 @@ const ToolTrainer = () => {
                             className="h-6 px-2 text-xs text-blue-300 hover:text-blue-200 hover:bg-blue-500/20 bg-transparent border-0"
                             onClick={() =>
                               copySignatureToClipboard(
-                                generatePythonSignature(tool.tool_name, func)
+                                generateCompactPythonSignature(tool.tool_name, func)
                               )
                             }
                           >
@@ -1522,7 +1639,7 @@ const ToolTrainer = () => {
                           </div>
                           <code className="text-xs text-green-300 font-mono break-all">
                             print(
-                            {generatePythonSignature(tool.tool_name, func)})
+                            {generateCompactPythonSignature(tool.tool_name, func)})
                           </code>
                         </div>
 
