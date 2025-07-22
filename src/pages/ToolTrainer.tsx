@@ -200,7 +200,7 @@ interface ToolCall {
 /**
  * Synchronizes tool results from the toolCalls state with the conversation messages.
  * This ensures that any edited tool results in the tool editor are reflected in the conversation display.
- * 
+ *
  * @param messages - Array of conversation messages with chunks
  * @param toolCalls - Array of current tool call objects with potentially updated results
  * @returns Updated messages array with synchronized tool results
@@ -222,10 +222,10 @@ function syncToolResultsWithMessages(messages, toolCalls) {
 
 /**
  * ToolTrainer Component
- * 
+ *
  * This is the main component for the LLM Tool Training Platform. It provides an interface
  * for creating, editing, and managing training examples for Large Language Model tool usage.
- * 
+ *
  * Key Features:
  * - Interactive conversation builder (user messages, assistant messages, tool calls)
  * - Real-time tool call execution and result management
@@ -233,17 +233,14 @@ function syncToolResultsWithMessages(messages, toolCalls) {
  * - Conversation step navigation (back/forward)
  * - Save/load training examples to/from database
  * - Tool schema validation and parameter management
- * 
+ *
  * Main State Management:
  * - conversation: Current conversation being built with messages and chunks
  * - toolCalls: Array of tool calls with their execution state and results
  * - currentStep: Whether we're on user turn or assistant turn
  * - Various UI state flags for modals, editors, etc.
- * 
- * Recent Bug Fixes:
- * - Fixed "Get All Results" to use edited tool call data instead of stale state
- * - Fixed "Back Step" to properly sync tool calls with remaining conversation
- * - Added proper tool call state synchronization throughout the component
+ *
+
  */
 const ToolTrainer = () => {
   // =============================================================================
@@ -685,158 +682,302 @@ const ToolTrainer = () => {
     );
   };
 
+  // const executeToolCall = async (index: number) => {
+  //   const toolCall = toolCalls[index];
+  //   if (!toolCall.pythonCode.trim()) return;
+
+  //   updateToolCall(index, { status: "executing" });
+
+  //   try {
+  //     const result = await executeToolMutation.mutateAsync({
+  //       code: toolCall.pythonCode,
+  //     });
+
+  //     const formattedResult =
+  //       typeof result.code_output === "object"
+  //         ? JSON.stringify(result.code_output, null, 2)
+  //         : String(result.code_output);
+
+  //     updateToolCall(index, { result: formattedResult, status: "completed" });
+
+  //     // ✅ UPDATED: Create tool_call chunk
+  //     const toolCallChunk: Chunk = {
+  //       text: JSON.stringify({
+  //         tool_name: toolCall.toolName,
+  //         parameters: toolCall.parameters,
+  //         python_code: toolCall.pythonCode,
+  //       }),
+  //       kind: ChunkKind.TOOL_CALL,
+  //       role: Role.ASSISTANT,
+  //       metadata: {
+  //         tool_id: toolCall.id,
+  //         status: "completed",
+  //       },
+  //       timestamp: new Date().toISOString(),
+  //     };
+
+  //     // ✅ UPDATED: Create tool_result chunk
+  //     const toolResultChunk: Chunk = {
+  //       text: formattedResult,
+  //       kind: ChunkKind.TOOL_RESULT,
+  //       role: Role.ASSISTANT,
+  //       metadata: {
+  //         tool_id: toolCall.id,
+  //         status: "completed",
+  //       },
+  //       timestamp: new Date().toISOString(),
+  //     };
+
+  //     // ✅ UPDATED: Add both chunks to assistant message
+  //     setConversation((prev) => {
+  //       const assistantMessageIndex = getOrCreateAssistantMessage();
+
+  //       if (assistantMessageIndex >= 0) {
+  //         // Add to existing assistant message
+  //         const newMessages = [...prev.messages];
+  //         newMessages[assistantMessageIndex] = {
+  //           ...newMessages[assistantMessageIndex],
+  //           chunks: [
+  //             ...newMessages[assistantMessageIndex].chunks,
+  //             toolCallChunk,
+  //             toolResultChunk,
+  //           ],
+  //         };
+  //         return {
+  //           ...prev,
+  //           messages: newMessages,
+  //           updatedAt: new Date(),
+  //         };
+  //       } else {
+  //         // Create new assistant message with both chunks
+  //         return {
+  //           ...prev,
+  //           messages: [
+  //             ...prev.messages,
+  //             { chunks: [toolCallChunk, toolResultChunk] },
+  //           ],
+  //           updatedAt: new Date(),
+  //         };
+  //       }
+  //     });
+
+  //     // Hide tool editor after successful execution
+  //     setShowToolEditor(false);
+  //   } catch (error) {
+  //     const errorMessage =
+  //       error instanceof Error ? error.message : "Execution failed";
+  //     updateToolCall(index, {
+  //       result: `Error: ${errorMessage}`,
+  //       status: "failed",
+  //     });
+
+  //     // ✅ UPDATED: Create error tool_call chunk
+  //     const toolCallChunk: Chunk = {
+  //       text: JSON.stringify({
+  //         tool_name: toolCall.toolName,
+  //         parameters: toolCall.parameters,
+  //         python_code: toolCall.pythonCode,
+  //       }),
+  //       kind: ChunkKind.TOOL_CALL,
+  //       role: Role.ASSISTANT,
+  //       metadata: {
+  //         tool_id: toolCall.id,
+  //         status: "failed",
+  //       },
+  //       timestamp: new Date().toISOString(),
+  //     };
+
+  //     // ✅ UPDATED: Create error tool_result chunk
+  //     const toolResultChunk: Chunk = {
+  //       text: `Error: ${errorMessage}`,
+  //       kind: ChunkKind.TOOL_RESULT,
+  //       role: Role.ASSISTANT,
+  //       metadata: {
+  //         tool_id: toolCall.id,
+  //         status: "failed",
+  //       },
+  //       timestamp: new Date().toISOString(),
+  //     };
+
+  //     // ✅ UPDATED: Add error chunks to assistant message
+  //     setConversation((prev) => {
+  //       const assistantMessageIndex = getOrCreateAssistantMessage();
+
+  //       if (assistantMessageIndex >= 0) {
+  //         // Add to existing assistant message
+  //         const newMessages = [...prev.messages];
+  //         newMessages[assistantMessageIndex] = {
+  //           ...newMessages[assistantMessageIndex],
+  //           chunks: [
+  //             ...newMessages[assistantMessageIndex].chunks,
+  //             toolCallChunk,
+  //             toolResultChunk,
+  //           ],
+  //         };
+  //         return {
+  //           ...prev,
+  //           messages: newMessages,
+  //           updatedAt: new Date(),
+  //         };
+  //       } else {
+  //         // Create new assistant message with both chunks
+  //         return {
+  //           ...prev,
+  //           messages: [
+  //             ...prev.messages,
+  //             { chunks: [toolCallChunk, toolResultChunk] },
+  //           ],
+  //           updatedAt: new Date(),
+  //         };
+  //       }
+  //     });
+
+  //     // Hide tool editor after failed execution
+  //     setShowToolEditor(false);
+  //   }
+  // };
   const executeToolCall = async (index: number) => {
     const toolCall = toolCalls[index];
     if (!toolCall.pythonCode.trim()) return;
 
+    // mark as executing
     updateToolCall(index, { status: "executing" });
 
+    // helper to create a TOOL_CALL chunk from a ToolCall object
+    const buildToolCallChunk = (
+      tc: ToolCall,
+      status: "completed" | "failed"
+    ): Chunk => ({
+      text: JSON.stringify({
+        tool_name: tc.toolName,
+        parameters: tc.parameters,
+        python_code: tc.pythonCode,
+      }),
+      kind: ChunkKind.TOOL_CALL,
+      role: Role.ASSISTANT,
+      metadata: { tool_id: tc.id, status },
+      timestamp: new Date().toISOString(),
+    });
+
+    // helper to create a TOOL_RESULT chunk from text
+    const buildToolResultChunk = (
+      tc: ToolCall,
+      text: string,
+      status: "completed" | "failed"
+    ): Chunk => ({
+      text,
+      kind: ChunkKind.TOOL_RESULT,
+      role: Role.ASSISTANT,
+      metadata: { tool_id: tc.id, status },
+      timestamp: new Date().toISOString(),
+    });
+
+    // helper that merges / inserts chunks correctly
+    const mergeChunks = (toolCallChunk: Chunk, toolResultChunk: Chunk) => {
+      setConversation((prev) => {
+        const allChunks = prev.messages.flatMap((m) => m.chunks);
+
+        const existingCallIdx = allChunks.findIndex(
+          (c) =>
+            c.kind === ChunkKind.TOOL_CALL &&
+            c.metadata?.tool_id === toolCall.id
+        );
+        const existingResultIdx = allChunks.findIndex(
+          (c) =>
+            c.kind === ChunkKind.TOOL_RESULT &&
+            c.metadata?.tool_id === toolCall.id
+        );
+
+        // shallow-copy messages for safe mutation
+        const newMessages = prev.messages.map((m) => ({
+          ...m,
+          chunks: [...m.chunks],
+        }));
+
+        // CASE 1 – tool_call already exists and result exists: just update result text
+        if (existingCallIdx !== -1 && existingResultIdx !== -1) {
+          const callMsgIdx = newMessages.findIndex((m) =>
+            m.chunks.some(
+              (c) =>
+                c.kind === ChunkKind.TOOL_RESULT &&
+                c.metadata?.tool_id === toolCall.id
+            )
+          );
+          if (callMsgIdx !== -1) {
+            const chunkIdx = newMessages[callMsgIdx].chunks.findIndex(
+              (c) =>
+                c.kind === ChunkKind.TOOL_RESULT &&
+                c.metadata?.tool_id === toolCall.id
+            );
+            newMessages[callMsgIdx].chunks[chunkIdx] = toolResultChunk;
+          }
+        }
+        // CASE 2 – tool_call exists but result was removed: insert result right after call
+        else if (existingCallIdx !== -1 && existingResultIdx === -1) {
+          const callMsgIdx = newMessages.findIndex((m) =>
+            m.chunks.some(
+              (c) =>
+                c.kind === ChunkKind.TOOL_CALL &&
+                c.metadata?.tool_id === toolCall.id
+            )
+          );
+          if (callMsgIdx !== -1) {
+            const callChunkIdx = newMessages[callMsgIdx].chunks.findIndex(
+              (c) =>
+                c.kind === ChunkKind.TOOL_CALL &&
+                c.metadata?.tool_id === toolCall.id
+            );
+            newMessages[callMsgIdx].chunks.splice(
+              callChunkIdx + 1,
+              0,
+              toolResultChunk
+            );
+          }
+        }
+        // CASE 3 – neither call nor result exist: append both to the current assistant message
+        else {
+          const assistantMessageIndex = getOrCreateAssistantMessage();
+          if (assistantMessageIndex >= 0) {
+            newMessages[assistantMessageIndex].chunks.push(
+              toolCallChunk,
+              toolResultChunk
+            );
+          } else {
+            newMessages.push({ chunks: [toolCallChunk, toolResultChunk] });
+          }
+        }
+
+        return { ...prev, messages: newMessages, updatedAt: new Date() };
+      });
+    };
+
     try {
-      const result = await executeToolMutation.mutateAsync({
+      const { code_output } = await executeToolMutation.mutateAsync({
         code: toolCall.pythonCode,
       });
 
       const formattedResult =
-        typeof result.code_output === "object"
-          ? JSON.stringify(result.code_output, null, 2)
-          : String(result.code_output);
+        typeof code_output === "object"
+          ? JSON.stringify(code_output, null, 2)
+          : String(code_output);
 
       updateToolCall(index, { result: formattedResult, status: "completed" });
 
-      // ✅ UPDATED: Create tool_call chunk
-      const toolCallChunk: Chunk = {
-        text: JSON.stringify({
-          tool_name: toolCall.toolName,
-          parameters: toolCall.parameters,
-          python_code: toolCall.pythonCode,
-        }),
-        kind: ChunkKind.TOOL_CALL,
-        role: Role.ASSISTANT,
-        metadata: {
-          tool_id: toolCall.id,
-          status: "completed",
-        },
-        timestamp: new Date().toISOString(),
-      };
+      mergeChunks(
+        buildToolCallChunk(toolCall, "completed"),
+        buildToolResultChunk(toolCall, formattedResult, "completed")
+      );
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Execution failed";
 
-      // ✅ UPDATED: Create tool_result chunk
-      const toolResultChunk: Chunk = {
-        text: formattedResult,
-        kind: ChunkKind.TOOL_RESULT,
-        role: Role.ASSISTANT,
-        metadata: {
-          tool_id: toolCall.id,
-          status: "completed",
-        },
-        timestamp: new Date().toISOString(),
-      };
+      updateToolCall(index, { result: `Error: ${errorMsg}`, status: "failed" });
 
-      // ✅ UPDATED: Add both chunks to assistant message
-      setConversation((prev) => {
-        const assistantMessageIndex = getOrCreateAssistantMessage();
-
-        if (assistantMessageIndex >= 0) {
-          // Add to existing assistant message
-          const newMessages = [...prev.messages];
-          newMessages[assistantMessageIndex] = {
-            ...newMessages[assistantMessageIndex],
-            chunks: [
-              ...newMessages[assistantMessageIndex].chunks,
-              toolCallChunk,
-              toolResultChunk,
-            ],
-          };
-          return {
-            ...prev,
-            messages: newMessages,
-            updatedAt: new Date(),
-          };
-        } else {
-          // Create new assistant message with both chunks
-          return {
-            ...prev,
-            messages: [
-              ...prev.messages,
-              { chunks: [toolCallChunk, toolResultChunk] },
-            ],
-            updatedAt: new Date(),
-          };
-        }
-      });
-
-      // Hide tool editor after successful execution
-      setShowToolEditor(false);
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Execution failed";
-      updateToolCall(index, {
-        result: `Error: ${errorMessage}`,
-        status: "failed",
-      });
-
-      // ✅ UPDATED: Create error tool_call chunk
-      const toolCallChunk: Chunk = {
-        text: JSON.stringify({
-          tool_name: toolCall.toolName,
-          parameters: toolCall.parameters,
-          python_code: toolCall.pythonCode,
-        }),
-        kind: ChunkKind.TOOL_CALL,
-        role: Role.ASSISTANT,
-        metadata: {
-          tool_id: toolCall.id,
-          status: "failed",
-        },
-        timestamp: new Date().toISOString(),
-      };
-
-      // ✅ UPDATED: Create error tool_result chunk
-      const toolResultChunk: Chunk = {
-        text: `Error: ${errorMessage}`,
-        kind: ChunkKind.TOOL_RESULT,
-        role: Role.ASSISTANT,
-        metadata: {
-          tool_id: toolCall.id,
-          status: "failed",
-        },
-        timestamp: new Date().toISOString(),
-      };
-
-      // ✅ UPDATED: Add error chunks to assistant message
-      setConversation((prev) => {
-        const assistantMessageIndex = getOrCreateAssistantMessage();
-
-        if (assistantMessageIndex >= 0) {
-          // Add to existing assistant message
-          const newMessages = [...prev.messages];
-          newMessages[assistantMessageIndex] = {
-            ...newMessages[assistantMessageIndex],
-            chunks: [
-              ...newMessages[assistantMessageIndex].chunks,
-              toolCallChunk,
-              toolResultChunk,
-            ],
-          };
-          return {
-            ...prev,
-            messages: newMessages,
-            updatedAt: new Date(),
-          };
-        } else {
-          // Create new assistant message with both chunks
-          return {
-            ...prev,
-            messages: [
-              ...prev.messages,
-              { chunks: [toolCallChunk, toolResultChunk] },
-            ],
-            updatedAt: new Date(),
-          };
-        }
-      });
-
-      // Hide tool editor after failed execution
-      setShowToolEditor(false);
+      mergeChunks(
+        buildToolCallChunk(toolCall, "failed"),
+        buildToolResultChunk(toolCall, `Error: ${errorMsg}`, "failed")
+      );
+    } finally {
+      setShowToolEditor(false); // close editor in all cases
     }
   };
 
@@ -844,67 +985,444 @@ const ToolTrainer = () => {
    * Executes all tool calls that have valid Python code.
    * This function retrieves the most current edited versions of tool calls from the conversation state
    * and executes them, ensuring that any edits made to tool calls are properly reflected in the results.
-   * 
+   *
    * Issues Fixed:
    * - Now properly uses edited tool call data from conversation messages
    * - Synchronizes results with both toolCalls state and conversation messages
    * - Prevents duplicate tool calls in conversation history
    */
+  // const executeAllToolCalls = async () => {
+  //   // Get the current tool calls with their latest edited Python code from conversation messages
+  //   const allChunks = conversation.messages.flatMap((m) => m.chunks);
+  //   const toolCallChunks = allChunks.filter(
+  //     (chunk) => chunk.kind === ChunkKind.TOOL_CALL
+  //   );
+
+  //   // Build updated tool calls from conversation state (includes edits)
+  //   const updatedToolCalls = toolCallChunks.map((chunk) => {
+  //     const toolData = JSON.parse(chunk.text || "{}");
+  //     const existingToolCall = toolCalls.find(
+  //       (tc) => tc.id === chunk.metadata?.tool_id
+  //     );
+
+  //     return {
+  //       id: chunk.metadata?.tool_id || `tool_${Date.now()}`,
+  //       toolName: toolData.tool_name || "",
+  //       parameters: toolData.parameters || {},
+  //       pythonCode: toolData.python_code || "",
+  //       result: existingToolCall?.result || "",
+  //       status: existingToolCall?.status || ("pending" as const),
+  //     };
+  //   });
+
+  //   // Filter tool calls that have code
+  //   const toolCallsWithCode = updatedToolCalls.filter((tc) =>
+  //     tc.pythonCode.trim()
+  //   );
+
+  //   if (toolCallsWithCode.length === 0) {
+  //     return;
+  //   }
+
+  //   // Update toolCalls state with current conversation data before execution
+  //   setToolCalls(updatedToolCalls);
+
+  //   // Set all tool calls to executing status
+  //   toolCallsWithCode.forEach((toolCall) => {
+  //     const originalIndex = updatedToolCalls.findIndex(
+  //       (tc) => tc.id === toolCall.id
+  //     );
+  //     if (originalIndex >= 0) {
+  //       const toolCallsIndex = toolCalls.findIndex(
+  //         (tc) => tc.id === toolCall.id
+  //       );
+  //       if (toolCallsIndex >= 0) {
+  //         updateToolCall(toolCallsIndex, { status: "executing" });
+  //       }
+  //     }
+  //   });
+
+  //   try {
+  //     // Prepare code chunks for API call
+  //     const codeChunks = toolCallsWithCode.map((toolCall, index) => ({
+  //       chunk_id: index,
+  //       code: toolCall.pythonCode,
+  //     }));
+
+  //     // Call the API
+  //     const result = await executeAllToolsMutation.mutateAsync({
+  //       code_chunks: codeChunks,
+  //     });
+
+  //     // Collect all new chunks to add at once to prevent duplicates
+  //     const newChunks: Chunk[] = [];
+
+  //     result.code_chunk_output.forEach((output) => {
+  //       const toolCall = toolCallsWithCode[output.chunk_id];
+  //       const originalIndex = toolCalls.findIndex(
+  //         (tc) => tc.id === toolCall.id
+  //       );
+
+  //       const formattedResult =
+  //         typeof output.code_output === "object"
+  //           ? JSON.stringify(output.code_output, null, 2)
+  //           : String(output.code_output);
+
+  //       updateToolCall(originalIndex, {
+  //         result: formattedResult,
+  //         status: "completed",
+  //       });
+
+  //       // Check if tool call already exists in conversation to prevent duplicates
+  //       const allChunks = conversation.messages.flatMap((m) => m.chunks);
+  //       const existingToolCall = allChunks.find(
+  //         (chunk) =>
+  //           chunk.kind === ChunkKind.TOOL_CALL &&
+  //           chunk.metadata?.tool_id === toolCall.id
+  //       );
+
+  //       // Only add tool call and result if they don't already exist
+  //       if (!existingToolCall) {
+  //         const toolCallChunk: Chunk = {
+  //           text: JSON.stringify({
+  //             tool_name: toolCall.toolName,
+  //             parameters: toolCall.parameters,
+  //             python_code: toolCall.pythonCode,
+  //           }),
+  //           kind: ChunkKind.TOOL_CALL,
+  //           role: Role.ASSISTANT,
+  //           metadata: {
+  //             tool_id: toolCall.id,
+  //             status: "completed",
+  //           },
+  //           timestamp: new Date().toISOString(),
+  //         };
+
+  //         const toolResultChunk: Chunk = {
+  //           text: formattedResult,
+  //           kind: ChunkKind.TOOL_RESULT,
+  //           role: Role.ASSISTANT,
+  //           metadata: {
+  //             tool_id: toolCall.id,
+  //             status: "completed",
+  //           },
+  //           timestamp: new Date().toISOString(),
+  //         };
+
+  //         newChunks.push(toolCallChunk, toolResultChunk);
+  //       } else {
+  //         // Update existing result if tool call already exists
+  //         setConversation((prev) => ({
+  //           ...prev,
+  //           messages: prev.messages.map((msg) => ({
+  //             ...msg,
+  //             chunks: msg.chunks.map((chunk) => {
+  //               if (
+  //                 chunk.kind === ChunkKind.TOOL_RESULT &&
+  //                 chunk.metadata?.tool_id === toolCall.id
+  //               ) {
+  //                 return { ...chunk, text: formattedResult };
+  //               }
+  //               return chunk;
+  //             }),
+  //           })),
+  //           updatedAt: new Date(),
+  //         }));
+  //       }
+  //     });
+
+  //     // Add all new chunks at once to assistant message
+  //     if (newChunks.length > 0) {
+  //       setConversation((prev) => {
+  //         const assistantMessageIndex = getOrCreateAssistantMessage();
+
+  //         if (assistantMessageIndex >= 0) {
+  //           // Add to existing assistant message
+  //           const newMessages = [...prev.messages];
+  //           newMessages[assistantMessageIndex] = {
+  //             ...newMessages[assistantMessageIndex],
+  //             chunks: [
+  //               ...newMessages[assistantMessageIndex].chunks,
+  //               ...newChunks,
+  //             ],
+  //           };
+  //           return {
+  //             ...prev,
+  //             messages: newMessages,
+  //             updatedAt: new Date(),
+  //           };
+  //         } else {
+  //           // Create new assistant message with all chunks
+  //           return {
+  //             ...prev,
+  //             messages: [...prev.messages, { chunks: newChunks }],
+  //             updatedAt: new Date(),
+  //           };
+  //         }
+  //       });
+  //     }
+
+  //     // Hide tool editor and show results in conversation area after execution
+  //     setShowToolEditor(false);
+  //   } catch (error) {
+  //     // Set all executing tool calls to failed status
+  //     toolCallsWithCode.forEach((toolCall) => {
+  //       const originalIndex = toolCalls.findIndex(
+  //         (tc) => tc.id === toolCall.id
+  //       );
+  //       const errorMessage =
+  //         error instanceof Error ? error.message : "Execution failed";
+  //       updateToolCall(originalIndex, {
+  //         result: `Error: ${errorMessage}`,
+  //         status: "failed",
+  //       });
+
+  //       // Check if tool call already exists to prevent duplicates
+  //       const allChunks = conversation.messages.flatMap((m) => m.chunks);
+  //       const existingToolCall = allChunks.find(
+  //         (chunk) =>
+  //           chunk.kind === ChunkKind.TOOL_CALL &&
+  //           chunk.metadata?.tool_id === toolCall.id
+  //       );
+
+  //       if (!existingToolCall) {
+  //         const toolCallChunk: Chunk = {
+  //           text: JSON.stringify({
+  //             tool_name: toolCall.toolName,
+  //             parameters: toolCall.parameters,
+  //             python_code: toolCall.pythonCode,
+  //           }),
+  //           kind: ChunkKind.TOOL_CALL,
+  //           role: Role.ASSISTANT,
+  //           metadata: {
+  //             tool_id: toolCall.id,
+  //             status: "failed",
+  //           },
+  //           timestamp: new Date().toISOString(),
+  //         };
+
+  //         const toolResultChunk: Chunk = {
+  //           text: `Error: ${errorMessage}`,
+  //           kind: ChunkKind.TOOL_RESULT,
+  //           role: Role.ASSISTANT,
+  //           metadata: {
+  //             tool_id: toolCall.id,
+  //             status: "failed",
+  //           },
+  //           timestamp: new Date().toISOString(),
+  //         };
+
+  //         setConversation((prev) => {
+  //           const assistantMessageIndex = getOrCreateAssistantMessage();
+
+  //           if (assistantMessageIndex >= 0) {
+  //             // Add to existing assistant message
+  //             const newMessages = [...prev.messages];
+  //             newMessages[assistantMessageIndex] = {
+  //               ...newMessages[assistantMessageIndex],
+  //               chunks: [
+  //                 ...newMessages[assistantMessageIndex].chunks,
+  //                 toolCallChunk,
+  //                 toolResultChunk,
+  //               ],
+  //             };
+  //             return {
+  //               ...prev,
+  //               messages: newMessages,
+  //               updatedAt: new Date(),
+  //             };
+  //           } else {
+  //             // Create new assistant message with both chunks
+  //             return {
+  //               ...prev,
+  //               messages: [
+  //                 ...prev.messages,
+  //                 { chunks: [toolCallChunk, toolResultChunk] },
+  //               ],
+  //               updatedAt: new Date(),
+  //             };
+  //           }
+  //         });
+  //       }
+  //     });
+  //   }
+  // };
+
+  // const removeToolCall = (index: number) => {
+  //   setToolCalls((prev) => prev.filter((_, i) => i !== index));
+  //   // Hide tool editor if no tool calls remain
+  //   if (toolCalls.length <= 1) {
+  //     setShowToolEditor(false);
+  //   }
+  // };
   const executeAllToolCalls = async () => {
-    // Get the current tool calls with their latest edited Python code from conversation messages
+    // Get current tool calls with their latest edited Python code
     const allChunks = conversation.messages.flatMap((m) => m.chunks);
-    const toolCallChunks = allChunks.filter(chunk => chunk.kind === ChunkKind.TOOL_CALL);
-    
-    // Build updated tool calls from conversation state (includes edits)
-    const updatedToolCalls = toolCallChunks.map(chunk => {
-      const toolData = JSON.parse(chunk.text || '{}');
-      const existingToolCall = toolCalls.find(tc => tc.id === chunk.metadata?.tool_id);
-      
+    const toolCallChunks = allChunks.filter(
+      (chunk) => chunk.kind === ChunkKind.TOOL_CALL
+    );
+
+    // Build updated tool calls from conversation state
+    const updatedToolCalls = toolCallChunks.map((chunk) => {
+      const toolData = JSON.parse(chunk.text || "{}");
+      const existingToolCall = toolCalls.find(
+        (tc) => tc.id === chunk.metadata?.tool_id
+      );
+
       return {
         id: chunk.metadata?.tool_id || `tool_${Date.now()}`,
-        toolName: toolData.tool_name || '',
+        toolName: toolData.tool_name || "",
         parameters: toolData.parameters || {},
-        pythonCode: toolData.python_code || '',
-        result: existingToolCall?.result || '',
-        status: existingToolCall?.status || 'pending' as const
+        pythonCode: toolData.python_code || "",
+        result: existingToolCall?.result || "",
+        status: existingToolCall?.status || ("pending" as const),
       };
     });
 
-    // Filter tool calls that have code
-    const toolCallsWithCode = updatedToolCalls.filter((tc) => tc.pythonCode.trim());
+    const toolCallsWithCode = updatedToolCalls.filter((tc) =>
+      tc.pythonCode.trim()
+    );
 
-    if (toolCallsWithCode.length === 0) {
-      return;
-    }
+    if (toolCallsWithCode.length === 0) return;
 
-    // Update toolCalls state with current conversation data before execution
+    // Update toolCalls state with current conversation data
     setToolCalls(updatedToolCalls);
 
-    // Set all tool calls to executing status
-    toolCallsWithCode.forEach((toolCall) => {
-      const originalIndex = updatedToolCalls.findIndex((tc) => tc.id === toolCall.id);
-      if (originalIndex >= 0) {
-        const toolCallsIndex = toolCalls.findIndex((tc) => tc.id === toolCall.id);
-        if (toolCallsIndex >= 0) {
-          updateToolCall(toolCallsIndex, { status: "executing" });
-        }
-      }
+    // Helper functions similar to executeToolCall
+    const buildToolCallChunk = (
+      tc: ToolCall,
+      status: "completed" | "failed"
+    ): Chunk => ({
+      text: JSON.stringify({
+        tool_name: tc.toolName,
+        parameters: tc.parameters,
+        python_code: tc.pythonCode,
+      }),
+      kind: ChunkKind.TOOL_CALL,
+      role: Role.ASSISTANT,
+      metadata: { tool_id: tc.id, status },
+      timestamp: new Date().toISOString(),
     });
 
+    const buildToolResultChunk = (
+      tc: ToolCall,
+      text: string,
+      status: "completed" | "failed"
+    ): Chunk => ({
+      text,
+      kind: ChunkKind.TOOL_RESULT,
+      role: Role.ASSISTANT,
+      metadata: { tool_id: tc.id, status },
+      timestamp: new Date().toISOString(),
+    });
+
+    const mergeChunksForToolCall = (
+      toolCall: ToolCall,
+      resultText: string,
+      status: "completed" | "failed"
+    ) => {
+      setConversation((prev) => {
+        const allChunks = prev.messages.flatMap((m) => m.chunks);
+
+        const existingCallIdx = allChunks.findIndex(
+          (c) =>
+            c.kind === ChunkKind.TOOL_CALL &&
+            c.metadata?.tool_id === toolCall.id
+        );
+        const existingResultIdx = allChunks.findIndex(
+          (c) =>
+            c.kind === ChunkKind.TOOL_RESULT &&
+            c.metadata?.tool_id === toolCall.id
+        );
+
+        const newMessages = prev.messages.map((m) => ({
+          ...m,
+          chunks: [...m.chunks],
+        }));
+
+        if (existingCallIdx !== -1 && existingResultIdx !== -1) {
+          // Update existing result
+          const resultMsgIdx = newMessages.findIndex((m) =>
+            m.chunks.some(
+              (c) =>
+                c.kind === ChunkKind.TOOL_RESULT &&
+                c.metadata?.tool_id === toolCall.id
+            )
+          );
+          if (resultMsgIdx !== -1) {
+            const chunkIdx = newMessages[resultMsgIdx].chunks.findIndex(
+              (c) =>
+                c.kind === ChunkKind.TOOL_RESULT &&
+                c.metadata?.tool_id === toolCall.id
+            );
+            newMessages[resultMsgIdx].chunks[chunkIdx] = buildToolResultChunk(
+              toolCall,
+              resultText,
+              status
+            );
+          }
+        } else if (existingCallIdx !== -1 && existingResultIdx === -1) {
+          // Add result after existing call
+          const callMsgIdx = newMessages.findIndex((m) =>
+            m.chunks.some(
+              (c) =>
+                c.kind === ChunkKind.TOOL_CALL &&
+                c.metadata?.tool_id === toolCall.id
+            )
+          );
+          if (callMsgIdx !== -1) {
+            const callChunkIdx = newMessages[callMsgIdx].chunks.findIndex(
+              (c) =>
+                c.kind === ChunkKind.TOOL_CALL &&
+                c.metadata?.tool_id === toolCall.id
+            );
+            newMessages[callMsgIdx].chunks.splice(
+              callChunkIdx + 1,
+              0,
+              buildToolResultChunk(toolCall, resultText, status)
+            );
+          }
+        } else {
+          // Add both call and result
+          const assistantMessageIndex = getOrCreateAssistantMessage();
+          if (assistantMessageIndex >= 0) {
+            newMessages[assistantMessageIndex].chunks.push(
+              buildToolCallChunk(toolCall, status),
+              buildToolResultChunk(toolCall, resultText, status)
+            );
+          } else {
+            newMessages.push({
+              chunks: [
+                buildToolCallChunk(toolCall, status),
+                buildToolResultChunk(toolCall, resultText, status),
+              ],
+            });
+          }
+        }
+
+        return { ...prev, messages: newMessages, updatedAt: new Date() };
+      });
+    };
+
     try {
-      // Prepare code chunks for API call
+      // Set all to executing
+      toolCallsWithCode.forEach((toolCall) => {
+        const originalIndex = toolCalls.findIndex(
+          (tc) => tc.id === toolCall.id
+        );
+        if (originalIndex >= 0) {
+          updateToolCall(originalIndex, { status: "executing" });
+        }
+      });
+
       const codeChunks = toolCallsWithCode.map((toolCall, index) => ({
         chunk_id: index,
         code: toolCall.pythonCode,
       }));
 
-      // Call the API
       const result = await executeAllToolsMutation.mutateAsync({
         code_chunks: codeChunks,
       });
-
-      // Collect all new chunks to add at once to prevent duplicates
-      const newChunks: Chunk[] = [];
 
       result.code_chunk_output.forEach((output) => {
         const toolCall = toolCallsWithCode[output.chunk_id];
@@ -917,191 +1435,35 @@ const ToolTrainer = () => {
             ? JSON.stringify(output.code_output, null, 2)
             : String(output.code_output);
 
-        updateToolCall(originalIndex, {
-          result: formattedResult,
-          status: "completed",
-        });
-
-        // Check if tool call already exists in conversation to prevent duplicates
-        const allChunks = conversation.messages.flatMap((m) => m.chunks);
-        const existingToolCall = allChunks.find(
-          (chunk) =>
-            chunk.kind === ChunkKind.TOOL_CALL &&
-            chunk.metadata?.tool_id === toolCall.id
-        );
-
-        // Only add tool call and result if they don't already exist
-        if (!existingToolCall) {
-          const toolCallChunk: Chunk = {
-            text: JSON.stringify({
-              tool_name: toolCall.toolName,
-              parameters: toolCall.parameters,
-              python_code: toolCall.pythonCode,
-            }),
-            kind: ChunkKind.TOOL_CALL,
-            role: Role.ASSISTANT,
-            metadata: {
-              tool_id: toolCall.id,
-              status: "completed",
-            },
-            timestamp: new Date().toISOString(),
-          };
-
-          const toolResultChunk: Chunk = {
-            text: formattedResult,
-            kind: ChunkKind.TOOL_RESULT,
-            role: Role.ASSISTANT,
-            metadata: {
-              tool_id: toolCall.id,
-              status: "completed",
-            },
-            timestamp: new Date().toISOString(),
-          };
-
-          newChunks.push(toolCallChunk, toolResultChunk);
-        } else {
-          // Update existing result if tool call already exists
-          setConversation((prev) => ({
-            ...prev,
-            messages: prev.messages.map((msg) => ({
-              ...msg,
-              chunks: msg.chunks.map((chunk) => {
-                if (
-                  chunk.kind === ChunkKind.TOOL_RESULT &&
-                  chunk.metadata?.tool_id === toolCall.id
-                ) {
-                  return { ...chunk, text: formattedResult };
-                }
-                return chunk;
-              }),
-            })),
-            updatedAt: new Date(),
-          }));
+        if (originalIndex >= 0) {
+          updateToolCall(originalIndex, {
+            result: formattedResult,
+            status: "completed",
+          });
         }
+
+        mergeChunksForToolCall(toolCall, formattedResult, "completed");
       });
 
-      // Add all new chunks at once to assistant message
-      if (newChunks.length > 0) {
-        setConversation((prev) => {
-          const assistantMessageIndex = getOrCreateAssistantMessage();
-
-          if (assistantMessageIndex >= 0) {
-            // Add to existing assistant message
-            const newMessages = [...prev.messages];
-            newMessages[assistantMessageIndex] = {
-              ...newMessages[assistantMessageIndex],
-              chunks: [
-                ...newMessages[assistantMessageIndex].chunks,
-                ...newChunks,
-              ],
-            };
-            return {
-              ...prev,
-              messages: newMessages,
-              updatedAt: new Date(),
-            };
-          } else {
-            // Create new assistant message with all chunks
-            return {
-              ...prev,
-              messages: [...prev.messages, { chunks: newChunks }],
-              updatedAt: new Date(),
-            };
-          }
-        });
-      }
-
-      // Hide tool editor and show results in conversation area after execution
       setShowToolEditor(false);
     } catch (error) {
-      // Set all executing tool calls to failed status
+      // Handle errors similarly
       toolCallsWithCode.forEach((toolCall) => {
         const originalIndex = toolCalls.findIndex(
           (tc) => tc.id === toolCall.id
         );
         const errorMessage =
           error instanceof Error ? error.message : "Execution failed";
-        updateToolCall(originalIndex, {
-          result: `Error: ${errorMessage}`,
-          status: "failed",
-        });
 
-        // Check if tool call already exists to prevent duplicates
-        const allChunks = conversation.messages.flatMap((m) => m.chunks);
-        const existingToolCall = allChunks.find(
-          (chunk) =>
-            chunk.kind === ChunkKind.TOOL_CALL &&
-            chunk.metadata?.tool_id === toolCall.id
-        );
-
-        if (!existingToolCall) {
-          const toolCallChunk: Chunk = {
-            text: JSON.stringify({
-              tool_name: toolCall.toolName,
-              parameters: toolCall.parameters,
-              python_code: toolCall.pythonCode,
-            }),
-            kind: ChunkKind.TOOL_CALL,
-            role: Role.ASSISTANT,
-            metadata: {
-              tool_id: toolCall.id,
-              status: "failed",
-            },
-            timestamp: new Date().toISOString(),
-          };
-
-          const toolResultChunk: Chunk = {
-            text: `Error: ${errorMessage}`,
-            kind: ChunkKind.TOOL_RESULT,
-            role: Role.ASSISTANT,
-            metadata: {
-              tool_id: toolCall.id,
-              status: "failed",
-            },
-            timestamp: new Date().toISOString(),
-          };
-
-          setConversation((prev) => {
-            const assistantMessageIndex = getOrCreateAssistantMessage();
-
-            if (assistantMessageIndex >= 0) {
-              // Add to existing assistant message
-              const newMessages = [...prev.messages];
-              newMessages[assistantMessageIndex] = {
-                ...newMessages[assistantMessageIndex],
-                chunks: [
-                  ...newMessages[assistantMessageIndex].chunks,
-                  toolCallChunk,
-                  toolResultChunk,
-                ],
-              };
-              return {
-                ...prev,
-                messages: newMessages,
-                updatedAt: new Date(),
-              };
-            } else {
-              // Create new assistant message with both chunks
-              return {
-                ...prev,
-                messages: [
-                  ...prev.messages,
-                  { chunks: [toolCallChunk, toolResultChunk] },
-                ],
-                updatedAt: new Date(),
-              };
-            }
+        if (originalIndex >= 0) {
+          updateToolCall(originalIndex, {
+            result: `Error: ${errorMessage}`,
+            status: "failed",
           });
         }
-      });
-    }
-  };
 
-  const removeToolCall = (index: number) => {
-    setToolCalls((prev) => prev.filter((_, i) => i !== index));
-    // Hide tool editor if no tool calls remain
-    if (toolCalls.length <= 1) {
-      setShowToolEditor(false);
+        mergeChunksForToolCall(toolCall, `Error: ${errorMessage}`, "failed");
+      });
     }
   };
 
@@ -1124,67 +1486,162 @@ const ToolTrainer = () => {
   };
 
   /**
-   * Goes back one step in the conversation by removing the last message.
-   * This function properly manages both conversation state and tool calls state.
-   * 
+   * Goes back one step in the conversation by removing the last chunk (not the entire message).
+   * This allows for granular step-by-step navigation through the conversation.
+   *
    * Issues Fixed:
-   * - Now properly syncs tool calls state with the remaining conversation after step back
-   * - Correctly determines the current turn (user/assistant) based on remaining messages
+   * - Now removes individual chunks instead of entire messages for precise step control
+   * - Properly syncs tool calls state with the remaining conversation after step back
+   * - Correctly determines the current turn (user/assistant) based on remaining chunks
    * - Cleans up tool calls that are no longer present in the conversation
    */
+  // const goBackStep = () => {
+  //   setConversation((prev) => {
+  //     // Find the last message with chunks
+  //     let newMessages = [...prev.messages];
+
+  //     if (newMessages.length === 0) {
+  //       return prev; // No messages to remove
+  //     }
+
+  //     // Get the last message
+  //     const lastMessageIndex = newMessages.length - 1;
+  //     const lastMessage = newMessages[lastMessageIndex];
+
+  //     if (lastMessage.chunks.length === 0) {
+  //       // If last message has no chunks, remove the entire message
+  //       newMessages = newMessages.slice(0, -1);
+  //     } else if (lastMessage.chunks.length === 1) {
+  //       // If last message has only one chunk, remove the entire message
+  //       newMessages = newMessages.slice(0, -1);
+  //     } else {
+  //       // If last message has multiple chunks, remove only the last chunk
+  //       const newChunks = lastMessage.chunks.slice(0, -1);
+  //       newMessages[lastMessageIndex] = {
+  //         ...lastMessage,
+  //         chunks: newChunks,
+  //       };
+  //     }
+
+  //     // If we have no messages left, reset to initial state
+  //     if (newMessages.length === 0) {
+  //       setCurrentStep("user");
+  //       setConversationStarted(false);
+  //       setHasAddedTextChunk(false);
+  //       setToolCalls([]);
+  //     } else {
+  //       // Determine current step based on the last remaining chunk
+  //       const allChunks = newMessages.flatMap((m) => m.chunks);
+  //       const lastChunk = allChunks[allChunks.length - 1];
+
+  //       if (lastChunk.role === Role.USER) {
+  //         setCurrentStep("assistant");
+  //         setHasAddedTextChunk(false);
+  //       } else {
+  //         // If last chunk is assistant text/tool call/tool result, we're in assistant turn
+  //         setCurrentStep("assistant");
+  //         setHasAddedTextChunk(false);
+  //       }
+
+  //       // Synchronize tool calls with remaining conversation
+  //       const remainingToolIds = allChunks
+  //         .filter((chunk) => chunk.kind === ChunkKind.TOOL_CALL)
+  //         .map((chunk) => chunk.metadata?.tool_id)
+  //         .filter(Boolean);
+
+  //       setToolCalls((prev) =>
+  //         prev.filter((tc) => remainingToolIds.includes(tc.id))
+  //       );
+  //     }
+
+  //     return { ...prev, messages: newMessages };
+  //   });
+
+  //   // Reset UI states
+  //   setShowTextChunkInput(false);
+  //   setMessageContent("");
+  // };
   const goBackStep = () => {
     setConversation((prev) => {
-      const newMessages = prev.messages.slice(0, -1);
+      // Find the last message with chunks
+      let newMessages = [...prev.messages];
 
-      // If we removed the last message and now have no messages, reset turn to user
+      if (newMessages.length === 0) {
+        return prev; // No messages to remove
+      }
+
+      // Get the last message
+      const lastMessageIndex = newMessages.length - 1;
+      const lastMessage = newMessages[lastMessageIndex];
+
+      if (lastMessage.chunks.length === 0) {
+        // If last message has no chunks, remove the entire message
+        newMessages = newMessages.slice(0, -1);
+      } else if (lastMessage.chunks.length === 1) {
+        // If last message has only one chunk, remove the entire message
+        newMessages = newMessages.slice(0, -1);
+      } else {
+        // If last message has multiple chunks, remove only the last chunk
+        const newChunks = lastMessage.chunks.slice(0, -1);
+        newMessages[lastMessageIndex] = {
+          ...lastMessage,
+          chunks: newChunks,
+        };
+      }
+
+      // ✅ UPDATED: Better synchronization of toolCalls state
+      const allChunks = newMessages.flatMap((m) => m.chunks);
+
+      const remainingToolIds = allChunks
+        .filter((chunk) => chunk.kind === ChunkKind.TOOL_CALL)
+        .map((chunk) => chunk.metadata?.tool_id)
+        .filter(Boolean);
+
+      const remainingResultIds = allChunks
+        .filter((chunk) => chunk.kind === ChunkKind.TOOL_RESULT)
+        .map((chunk) => chunk.metadata?.tool_id)
+        .filter(Boolean);
+
+      // Update toolCalls state to reflect current conversation state
+      setToolCalls((prev) =>
+        prev
+          .map((tc) => {
+            if (!remainingToolIds.includes(tc.id)) {
+              // Tool call was completely removed
+              return null;
+            } else if (
+              remainingToolIds.includes(tc.id) &&
+              !remainingResultIds.includes(tc.id)
+            ) {
+              // Tool call exists but result was removed
+              return { ...tc, status: "pending" as const, result: "" };
+            }
+            return tc;
+          })
+          .filter(Boolean)
+      );
+
+      // Handle state updates based on remaining content
       if (newMessages.length === 0) {
         setCurrentStep("user");
         setConversationStarted(false);
         setHasAddedTextChunk(false);
-        // Clear all tool calls when conversation is empty
         setToolCalls([]);
       } else {
-        // Check if the remaining conversation has any assistant messages
-        const allChunks = newMessages.flatMap((m) => m.chunks);
-        const hasAssistantChunks = allChunks.some(
-          (chunk) =>
-            chunk.role === Role.ASSISTANT ||
-            chunk.kind === ChunkKind.TOOL_CALL ||
-            chunk.kind === ChunkKind.TOOL_RESULT
-        );
+        // Determine current step based on the last remaining chunk
+        const lastChunk = allChunks[allChunks.length - 1];
 
-        // If no assistant chunks remain, switch to user turn
-        if (!hasAssistantChunks) {
-          setCurrentStep("user");
-          setHasAddedTextChunk(true); // User has added their message
+        if (lastChunk.role === Role.USER) {
+          setCurrentStep("assistant");
+          setHasAddedTextChunk(false);
         } else {
-          // Check if last message is from user or assistant
-          const lastMessage = newMessages[newMessages.length - 1];
-          const lastChunk = lastMessage.chunks[lastMessage.chunks.length - 1];
-          if (lastChunk.role === Role.USER) {
-            setCurrentStep("assistant");
-            setHasAddedTextChunk(false);
-          } else {
-            setCurrentStep("user");
-            setHasAddedTextChunk(true);
-          }
+          // If last chunk is assistant, we're in assistant turn
+          setCurrentStep("assistant");
+          setHasAddedTextChunk(false);
         }
-
-        // Synchronize tool calls with remaining conversation
-        const remainingToolIds = allChunks
-          .filter((chunk) => chunk.kind === ChunkKind.TOOL_CALL)
-          .map((chunk) => chunk.metadata?.tool_id)
-          .filter(Boolean);
-
-        setToolCalls((prev) =>
-          prev.filter((tc) => remainingToolIds.includes(tc.id))
-        );
       }
 
-      return {
-        ...prev,
-        messages: newMessages,
-      };
+      return { ...prev, messages: newMessages };
     });
 
     // Reset UI states
@@ -1301,15 +1758,55 @@ const ToolTrainer = () => {
   }, [conversation.messages]);
 
   // Handler for executing individual tool call from conversation
+  // const handleExecuteIndividualToolCall = async (toolCallChunk: Chunk) => {
+  //   try {
+  //     // Parse the tool call to extract python code
+  //     let pythonCode;
+  //     try {
+  //       const toolData = JSON.parse(toolCallChunk.text);
+  //       pythonCode = toolData.python_code;
+  //     } catch {
+  //       // If it's not JSON, treat the chunk text as python code directly
+  //       pythonCode = toolCallChunk.text;
+  //     }
+
+  //     const result = await executeToolMutation.mutateAsync({
+  //       code: pythonCode,
+  //     });
+
+  //     const formattedResult =
+  //       typeof result.code_output === "object"
+  //         ? JSON.stringify(result.code_output, null, 2)
+  //         : String(result.code_output);
+
+  //     // Update the corresponding result chunk
+  //     setConversation((prev) => ({
+  //       ...prev,
+  //       messages: prev.messages.map((msg) => ({
+  //         ...msg,
+  //         chunks: msg.chunks.map((chunk) => {
+  //           if (
+  //             chunk.kind === ChunkKind.TOOL_RESULT &&
+  //             chunk.metadata?.tool_id === toolCallChunk.metadata?.tool_id
+  //           ) {
+  //             return { ...chunk, text: formattedResult };
+  //           }
+  //           return chunk;
+  //         }),
+  //       })),
+  //       updatedAt: new Date(),
+  //     }));
+  //   } catch (error) {
+  //     console.error("Failed to execute tool call:", error);
+  //   }
+  // };
   const handleExecuteIndividualToolCall = async (toolCallChunk: Chunk) => {
     try {
-      // Parse the tool call to extract python code
       let pythonCode;
       try {
         const toolData = JSON.parse(toolCallChunk.text);
         pythonCode = toolData.python_code;
       } catch {
-        // If it's not JSON, treat the chunk text as python code directly
         pythonCode = toolCallChunk.text;
       }
 
@@ -1322,7 +1819,7 @@ const ToolTrainer = () => {
           ? JSON.stringify(result.code_output, null, 2)
           : String(result.code_output);
 
-      // Update the corresponding result chunk
+      // ✅ UPDATED: Use the same merging logic as executeToolCall
       setConversation((prev) => ({
         ...prev,
         messages: prev.messages.map((msg) => ({
@@ -1332,7 +1829,14 @@ const ToolTrainer = () => {
               chunk.kind === ChunkKind.TOOL_RESULT &&
               chunk.metadata?.tool_id === toolCallChunk.metadata?.tool_id
             ) {
-              return { ...chunk, text: formattedResult };
+              return {
+                ...chunk,
+                text: formattedResult,
+                metadata: {
+                  ...chunk.metadata,
+                  status: "completed",
+                },
+              };
             }
             return chunk;
           }),
@@ -1341,6 +1845,33 @@ const ToolTrainer = () => {
       }));
     } catch (error) {
       console.error("Failed to execute tool call:", error);
+
+      // ✅ UPDATED: Also handle error state properly
+      const errorMessage =
+        error instanceof Error ? error.message : "Execution failed";
+      setConversation((prev) => ({
+        ...prev,
+        messages: prev.messages.map((msg) => ({
+          ...msg,
+          chunks: msg.chunks.map((chunk) => {
+            if (
+              chunk.kind === ChunkKind.TOOL_RESULT &&
+              chunk.metadata?.tool_id === toolCallChunk.metadata?.tool_id
+            ) {
+              return {
+                ...chunk,
+                text: `Error: ${errorMessage}`,
+                metadata: {
+                  ...chunk.metadata,
+                  status: "failed",
+                },
+              };
+            }
+            return chunk;
+          }),
+        })),
+        updatedAt: new Date(),
+      }));
     }
   };
 
@@ -2149,8 +2680,7 @@ import json
                         onClick={() => executeToolCall(index)}
                         disabled={
                           !toolCall.pythonCode.trim() ||
-                          toolCall.status === "executing" ||
-                          toolCall.status === "completed"
+                          toolCall.status === "executing"
                         }
                         className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white disabled:opacity-50 shadow-lg transition-all duration-200"
                       >
